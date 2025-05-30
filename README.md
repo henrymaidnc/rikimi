@@ -126,3 +126,13 @@ Recommend practice exercises tailored to the user's weak points and goals.
 ### Chatbot Assistant
 Interactive chatbot to help explain grammar, vocabulary, or schedule tests.
 
+Here's the image chart showing your project phases:
+https://files.oaiusercontent.com/file-7R1e1KhGMUijcCpRg9fo5G?se=2025-05-30T06%3A56%3A31Z&sp=r&sv=2024-08-04&sr=b&rscc=max-age%3D299%2C%20immutable%2C%20private&rscd=attachment%3B%20filename%3Dc8623e09-0f74-4c83-a525-0d6f592facbc&sig=9iTdcZZZxAvrbV0B1AIXbcdJ8RJqsvRjWDoNw6uf8zo%3D
+
+Phase 1: General – Ends on 10 June 2025
+
+Phase 2: Personalization – Ends on 10 July 2025
+
+Phase 3: Apply AI Agent – Ends on 10 August 2025
+
+
