@@ -1,18 +1,20 @@
-# Rikimi
+![image](https://github.com/user-attachments/assets/af26bca9-7f0d-4018-9e6a-0120a471546d)# Rikimi
 
 🌿 I am passionate about integrating technology into my daily life to make things easier and more efficient in an increasingly fast-paced world. Alongside my full-time job from 8 to 5, I have a strong desire to learn Japanese. However, keeping up with vocabulary and grammar from my frequent classes (three to five times a week) is challenging. To overcome this, I want to develop an application that makes learning Japanese more accessible, helping me retain words and grammar while allowing me to manage my time effectively and maintain a balanced, lighter lifestyle.
 
 🧭 Global Layout Structure
 * Top Navigation Bar
-    * Logo + App Title (with a 📘 or 🎌 icon)
+    * Logo + App Title (left, with a Rikimi icon)
     * 🔍 Global Search bar (centered, responsive)
-    * 📄 “Documents”, 🎮 “Practice”, 📊 “JLPT Info” tabs or icons
+    * Icon profile (right)
     * [Optional] Dark/light toggle, settings
 * Sidebar (Mobile collapsible)
-    * 📘 Book List
-    * 🎮 Practice Hub
-    * 📊 JLPT Info
-    * 🗂 Upload Data (Exercise + Questions)
+    * Dashboard
+    * Books
+    * Notes
+    * Practice Hub
+    * JLPT Planner
+    * Manage Questions
 
 📄 Documents Page (Books & Chapters)
 UI:
@@ -89,28 +91,38 @@ Optionally:
 * Touch-friendly buttons & forms (min 48px height)
 * Collapse menus into accordions/tabs on small screens
 
-🧩 Suggested Component Map (Lovable UI Generation)
-Component	Description
-BookCard	Show book icon, title, and count of chapters
-ChapterListItem	Chapter title, JLPT badge
-WordCard	Flip card (front: word, back: meaning + example)
-GrammarCard	Grammar rule, usage, example
-FlashcardGame	Flip logic, next/prev
-TimedQuiz	Timer logic, score tracker
-JLPTStatCard	Visual card for vocab/grammar/kanji counts
-ProgressBar	For JLPT requirement vs user learned count
-UploadSection	Drag & drop Excel, file preview
-SearchBox	Topbar search input, filter type (word, grammar, kanji)
+# 🎯 Milestones
 
-🎨 Design Tips (Cute and Green)
-* Theme Color: Focus green (#38B48B) for buttons, links, highlights
-* Secondary Colors: Light beige or soft gray backgrounds
-* Icons: Use emoji or SVG:
-    * 📘 Word
-    * ✏️ Grammar
-    * 🈶 Kanji
-    * 🎮 Games
-    * 📊 Stats
-    * 🔍 Search
-    * 📥 Upload
-    * 📤 Download
+## ✅ Phase 1: General
+Focus on foundational features for language learning and test preparation.
+
+### Vocabulary & Grammar Search
+Enable search functionality for vocabulary, grammar points, and class notes.
+
+### Class Notes Storage
+Store and organize grammar explanations and vocabulary from classes.
+
+### Practice Test System
+Allow users to take JLPT-style practice tests and track their scores.
+
+## 🔐 Phase 2: Personalization
+Introduce user-specific features and a tracking mechanism.
+
+### Authentication & Authorization
+User registration, login, roles, and access control.
+
+### Progress Tracking System
+Track user performance, test history, and learning progress over time.
+
+### Personalized Dashboard
+Display current level, strengths, and weak areas based on test results.
+
+## 🤖 Phase 3: AI-Powered Features
+Enhance the platform with intelligent agents and recommendation systems.
+
+### AI Exercise Recommender
+Recommend practice exercises tailored to the user's weak points and goals.
+
+### Chatbot Assistant
+Interactive chatbot to help explain grammar, vocabulary, or schedule tests.
+
