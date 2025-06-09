@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ArrowLeft, BookOpen, Edit, Plus, Pencil, Trash2, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { API_BASE_URL } from '@/config';
 
-const API_BASE_URL = 'http://localhost:8009/api';
 
 interface Vocabulary {
   id: number;
