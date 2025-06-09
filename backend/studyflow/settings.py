@@ -7,7 +7,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
 DEBUG = int(os.environ.get('DEBUG', 0))
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost 127.0.0.1 [::1]').split()
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost 127.0.0.1 [::1] 13.220.164.76').split()
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -105,17 +105,7 @@ REST_FRAMEWORK = {
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:8081",
-    "http://127.0.0.1:8081",
-    "http://localhost:8082",
-    "http://127.0.0.1:8082",
-    "http://192.168.5.63:8080",
-    "http://192.168.1.8:8081",
-    "http://localhost:8009"
+    "http://13.220.164.76",  # Add your EC2 IP
 ]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
