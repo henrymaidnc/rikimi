@@ -198,6 +198,8 @@ export default function Chapters() {
       level: newChapter.level,
       book_name: newChapter.bookName,
       chapter_number: parseInt(newChapter.chapterNumber),
+      title: `${newChapter.bookName} - Chapter ${newChapter.chapterNumber}`,
+      description: newChapter.description || "",
     };
 
     try {
