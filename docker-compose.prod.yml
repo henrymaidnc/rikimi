@@ -26,9 +26,9 @@ services:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     environment:
-      - DEBUG=0
+      - DEBUG=1
       - SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DJANGO_ALLOWED_HOSTS=${DJANGO_ALLOWED_HOSTS}
+      - DJANGO_ALLOWED_HOSTS=13.220.164.76 localhost 127.0.0.1 [::1]
       - POSTGRES_DB=studyflow
       - POSTGRES_USER=studyflow
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

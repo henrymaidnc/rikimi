@@ -7,8 +7,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
 DEBUG = int(os.environ.get('DEBUG', 1))  # Set to 1 for debugging
 
-# Allow all hosts for now
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost 127.0.0.1 [::1]').split()
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -94,7 +93,14 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS settings
-CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins for now
+CORS_ALLOWED_ORIGINS = [
+    "http://13.220.164.76",
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
