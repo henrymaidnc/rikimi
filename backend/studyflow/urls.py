@@ -10,6 +10,7 @@ from practice.views import (
     InputTestAttemptViewSet,
     VocabularyInputTestQuestionViewSet
 )
+from .views import health_check
 
 router = DefaultRouter()
 router.register(r'chapters', ChapterViewSet)
@@ -27,4 +28,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     path('api-auth/', include('rest_framework.urls')),
+    path('health/', health_check, name='health_check'),
 ] 
