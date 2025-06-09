@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ArrowLeft, BookOpen, Edit, Plus, Pencil, Trash2, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-const API_BASE_URL = 'http://localhost:8008/api';
+const API_BASE_URL = 'http://localhost:8009/api';
 
 interface Vocabulary {
   id: number;
