@@ -28,7 +28,7 @@ services:
     environment:
       - DEBUG=1
       - SECRET_KEY=${DJANGO_SECRET_KEY}
-      - DJANGO_ALLOWED_HOSTS=13.220.164.76 localhost 127.0.0.1 [::1]
+      - DJANGO_ALLOWED_HOSTS=www.rikimi.edu.vn rikimi.edu.vn localhost 127.0.0.1 [::1]
       - POSTGRES_DB=studyflow
       - POSTGRES_USER=studyflow
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -59,6 +59,7 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
       - static_volume:/app/staticfiles
       - media_volume:/app/media
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     ports:
       - "80:80"
       - "443:443"
