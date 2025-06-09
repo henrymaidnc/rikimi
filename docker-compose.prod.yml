@@ -12,12 +12,16 @@ services:
     networks:
       - studyflow_network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U studyflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
-    command: gunicorn studyflow.wsgi:application --bind 0.0.0.0:8000
     volumes:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
@@ -31,7 +35,8 @@ services:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - studyflow_network
     restart: unless-stopped
@@ -70,5 +75,8 @@ networks:
 
 volumes:
   postgres_data:
+    driver: local
   static_volume:
-  media_volume: 
+    driver: local
+  media_volume:
+    driver: local 
