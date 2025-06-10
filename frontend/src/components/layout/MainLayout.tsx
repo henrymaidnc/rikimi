@@ -78,7 +78,7 @@ export function MainLayout({ children, className }: MainLayoutProps) {
         {/* Page content */}
         <main
           className={cn(
-            "flex-1 p-4 md:p-6 pb-32 md:pb-6 pt-20 overflow-y-auto",
+            "flex-1 p-4 md:p-6 pb-32 md:pb-6 overflow-y-auto",
             className
           )}
           style={{ maxHeight: 'calc(100vh - 4rem)' }} // 4rem = 64px header height

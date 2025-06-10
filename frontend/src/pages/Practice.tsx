@@ -111,7 +111,7 @@ export default function Practice() {
 
   return (
     <MainLayout>
-      <div className="w-full min-h-[80vh] flex items-start sm:items-center justify-center bg-gradient-to-br from-sakura-50 via-bamboo-50 to-white py-8 px-2 sm:px-6 overflow-y-auto">
+      <div className="w-full min-h-[80vh] flex items-start sm:items-center justify-center bg-gradient-to-br via-bamboo-50 to-white sm:px-6 overflow-y-auto">
         <div className="w-full max-w-4xl mx-auto rounded-2xl shadow-2xl bg-white/90 border border-green-100 p-6 sm:p-8 space-y-8">
           <h1 className="text-3xl font-bold text-green-900 text-center">Practice Hub</h1>
           

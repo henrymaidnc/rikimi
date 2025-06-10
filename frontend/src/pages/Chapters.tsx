@@ -14,55 +14,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import * as XLSX from 'xlsx';
 import { API_BASE_URL } from '@/config';
 
-// Mock data - in a real app, this would come from localStorage or an API
-const MOCK_CHAPTERS: Chapter[] = [
-  {
-    id: "chapter1",
-    title: "Minna no Nihongo 1 - Chapter 1",
-    description: "Basic greetings and self-introduction",
-    level: "N5",
-    bookName: "Minna no Nihongo 1",
-    chapterNumber: 1,
-    words: [
-      { word: "こんにちは", meaning: "Hello", example: "こんにちは、田中です。" },
-      { word: "はじめまして", meaning: "Nice to meet you", example: "はじめまして、よろしくお願いします。" }
-    ],
-    exercises: [
-      {
-        id: "ex1",
-        title: "Basic Greetings",
-        content: "Content for basic greetings",
-        chapterId: "chapter1",
-      },
-      {
-        id: "ex2",
-        title: "Self Introduction",
-        content: "Content for self introduction",
-        chapterId: "chapter1",
-      },
-    ],
-  },
-  {
-    id: "chapter2",
-    title: "Minna no Nihongo 1 - Chapter 2",
-    description: "Daily conversations and basic verbs",
-    level: "N5",
-    bookName: "Minna no Nihongo 1",
-    chapterNumber: 2,
-    words: [
-      { word: "食べる", meaning: "To eat", example: "朝ご飯を食べます。" },
-      { word: "飲む", meaning: "To drink", example: "コーヒーを飲みます。" }
-    ],
-    exercises: [
-      {
-        id: "ex3",
-        title: "Daily Activities",
-        content: "Content for daily activities",
-        chapterId: "chapter2",
-      },
-    ],
-  },
-];
 
 interface WordData {
   word: string;
