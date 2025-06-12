@@ -79,11 +79,13 @@ export default function ChapterDetail() {
         const transformedChapter = {
           ...data,
           bookName: data.book_name,
-          chapterNumber: data.order,
+          chapterNumber: data.chapter_number,
           words: data.vocabularies || [],
           exercises: [],
           grammar_patterns: data.grammar_patterns || []
         };
+        
+        console.log('Transformed chapter:', transformedChapter);
         setChapter(transformedChapter);
         setEditedChapter(transformedChapter);
       } catch (error) {
