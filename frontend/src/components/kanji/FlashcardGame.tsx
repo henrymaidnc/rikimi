@@ -5,11 +5,17 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { RotateCcw, CheckCircle, XCircle, Eye } from "lucide-react";
 import { API_BASE_URL } from '@/config';
+import { ChapterSelector } from "./ChapterSelector";
+
+interface Chapter {
+  id: number;
+  book_name: string;
+  chapter_number: number;
+  level: string;
+}
 
 interface FlashcardGameProps {
   onExit: () => void;
-  bookName: string;
-  chapterNumber: number;
   questionType: "vocabulary" | "grammar" | "kanji";
 }
 
@@ -21,58 +27,73 @@ function shuffleArray(array: any[]) {
   return array;
 }
 
-export function FlashcardGame({ onExit, bookName, chapterNumber, questionType }: FlashcardGameProps) {
+export function FlashcardGame({ onExit, questionType }: FlashcardGameProps) {
+  const [selectedChapters, setSelectedChapters] = useState<Chapter[]>([]);
   const [cardList, setCardList] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
   const [incorrectCount, setIncorrectCount] = useState(0);
   const [studiedCards, setStudiedCards] = useState<Set<number>>(new Set());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      // 1. Get chapter id
-      const chapterRes = await fetch(
-        `${API_BASE_URL}/chapters/?book_name=${encodeURIComponent(bookName)}&chapter_number=${chapterNumber}`
-      );
-      const chapterData = await chapterRes.json();
-      if (!chapterData.results || !chapterData.results.length) {
-        setCardList([]);
-        setLoading(false);
-        return;
-      }
-      const chapterId = chapterData.results[0].id;
-      let cards: any[] = [];
+  const fetchCards = async (chapters: Chapter[]) => {
+    setLoading(true);
+    let allCards: any[] = [];
+
+    for (const chapter of chapters) {
       if (questionType === "vocabulary" || questionType === "kanji") {
-        // Use vocabularies for both vocabulary and kanji flashcards
         const vocabRes = await fetch(
-          `${API_BASE_URL}/vocabularies/?chapter=${chapterId}`
+          `${API_BASE_URL}/vocabularies/?chapter=${chapter.id}`
         );
         const vocabData = await vocabRes.json();
-        cards = shuffleArray(vocabData.results || []);
-        if (cards.length > 10) cards = cards.slice(0, 10);
+        allCards = [...allCards, ...(vocabData.results || [])];
       } else if (questionType === "grammar") {
         const grammarRes = await fetch(
-          `${API_BASE_URL}/grammar_patterns/?chapter=${chapterId}`
+          `${API_BASE_URL}/grammar_patterns/?chapter=${chapter.id}`
         );
         const grammarData = await grammarRes.json();
-        console.log('Fetched grammar patterns:', grammarData); // Debug log
-        cards = shuffleArray(grammarData.results || []);
-        if (cards.length > 10) cards = cards.slice(0, 10);
+        allCards = [...allCards, ...(grammarData.results || [])];
       }
-      setCardList(cards);
-      setLoading(false);
-    };
-    fetchData();
-  }, [bookName, chapterNumber, questionType]);
+    }
+
+    // Shuffle and limit to 20 cards
+    allCards = shuffleArray(allCards);
+    if (allCards.length > 20) {
+      allCards = allCards.slice(0, 20);
+    }
+
+    setCardList(allCards);
+    setLoading(false);
+  };
+
+  const handleChapterSelect = (chapters: Chapter[]) => {
+    setSelectedChapters(chapters);
+    fetchCards(chapters);
+  };
+
+  if (!selectedChapters.length) {
+    return <ChapterSelector onSelect={handleChapterSelect} onCancel={onExit} />;
+  }
 
   if (loading) {
-    return <div>Loading flashcards...</div>;
+    return (
+      <div className="flex items-center justify-center h-[50vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading flashcards...</p>
+        </div>
+      </div>
+    );
   }
+
   if (!cardList.length) {
-    return <div>No flashcards found for this chapter.</div>;
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground mb-4">No flashcards found for the selected chapters.</p>
+        <Button onClick={() => setSelectedChapters([])}>Select Different Chapters</Button>
+      </div>
+    );
   }
 
   const currentCard = cardList[currentIndex];
