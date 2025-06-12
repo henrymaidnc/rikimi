@@ -166,7 +166,7 @@ export default function ChapterDetail() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/chapters/${id}/vocabulary/${editedWord.id}/`, {
+      const response = await fetch(`${API_BASE_URL}/vocabularies/${editedWord.id}/`, {
         method: 'PATCH',
         headers: {
           'Accept': 'application/json',
