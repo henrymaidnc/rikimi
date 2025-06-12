@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -68,7 +67,10 @@ export default function KanjiPractice() {
                 {game.title}
               </h1>
             </div>
-            <GameComponent onExit={() => setCurrentGame(null)} />
+            <GameComponent 
+              onExit={() => setCurrentGame(null)} 
+              questionType={currentGame === "vocabulary" ? "vocabulary" : "kanji"}
+            />
           </div>
         </MainLayout>
       );
