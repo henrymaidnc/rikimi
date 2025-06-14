@@ -1,22 +1,11 @@
 import os
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
-DEBUG = int(os.environ.get('DEBUG', 0))  # Set to 0 for production
-
 ALLOWED_HOSTS = ['www.rikimi.edu.vn', 'rikimi.edu.vn', 'localhost', '127.0.0.1']
-
-# Security settings
-SECURE_SSL_REDIRECT = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = 31536000  # 1 year
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -36,9 +25,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # Make sure this is as high as possible
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -101,51 +89,6 @@ STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# CSRF Settings
-CSRF_TRUSTED_ORIGINS = [
-    'https://www.rikimi.edu.vn',
-    'https://rikimi.edu.vn',
-    'http://localhost:8082',
-]
-CSRF_COOKIE_SECURE = True
-CSRF_COOKIE_SAMESITE = 'Lax'
-CSRF_COOKIE_HTTPONLY = False
-CSRF_USE_SESSIONS = False
-CSRF_COOKIE_DOMAIN = '.rikimi.edu.vn'
-
-# Session Settings
-SESSION_COOKIE_SECURE = True
-SESSION_COOKIE_SAMESITE = 'Lax'
-SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_DOMAIN = '.rikimi.edu.vn'
-
-# CORS Settings
-CORS_ALLOWED_ORIGINS = [
-    'https://www.rikimi.edu.vn',
-    'https://rikimi.edu.vn',
-    'http://localhost:8082',
-]
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_METHODS = [
-    'DELETE',
-    'GET',
-    'OPTIONS',
-    'PATCH',
-    'POST',
-    'PUT',
-]
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-]
 
 # REST Framework settings
 REST_FRAMEWORK = {

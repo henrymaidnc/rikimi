@@ -8,11 +8,13 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: true,
     port: 8081,
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'http://localhost:8009',
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path.replace(/^\/api/, ''),
       }
     }
   },

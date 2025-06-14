@@ -26,7 +26,7 @@ services:
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     environment:
-      - DEBUG=1
+      - DEBUG=0
       - SECRET_KEY=${DJANGO_SECRET_KEY}
       - DJANGO_ALLOWED_HOSTS=www.rikimi.edu.vn localhost 127.0.0.1 [::1]
       - POSTGRES_DB=studyflow
@@ -34,6 +34,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
+      - DJANGO_ENV=production
     depends_on:
       db:
         condition: service_healthy

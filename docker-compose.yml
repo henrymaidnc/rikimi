@@ -11,12 +11,17 @@ services:
       - POSTGRES_PASSWORD=postgres
     ports:
       - "5439:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build: ./backend
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+             python manage.py runserver 0.0.0.0:8000 --noreload"
     volumes:
       - ./backend:/app
     ports:
@@ -29,8 +34,12 @@ services:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
       - DEBUG=1
+      - DJANGO_ENV=development
+      - DJANGO_SETTINGS_MODULE=studyflow.settings.development
+      - PYTHONUNBUFFERED=1
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
   frontend:
     build: ./frontend
@@ -40,7 +49,9 @@ services:
     ports:
       - "8082:8081"
     environment:
+      - NODE_ENV=development
       - VITE_API_URL=http://localhost:8009
+      - VITE_DEV_SERVER_URL=http://localhost:8082
     depends_on:
       - backend
 
