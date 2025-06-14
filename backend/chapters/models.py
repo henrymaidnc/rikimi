@@ -13,7 +13,7 @@ class Chapter(BaseModel):
         unique_together = ('book_name', 'chapter_number')
 
     def __str__(self):
-        return f"{self.book_name} - ({self.level})"
+        return f"{self.book_name} - {self.level} - {self.chapter_number}"
 
 
 class Vocabulary(BaseModel):
