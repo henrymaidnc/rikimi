@@ -1,0 +1,5 @@
+{word: 'なにかごきぼうがありますか 何かご希望がありますか', meaning: 'Anh/chị có nguyện vọng gì không?', example: '旅行について何かご希望がありますか？ (Bạn có nguyện vọng gì về chuyến du lịch không?)', chapter: 91}
+{word: 'しっぱいします（しけんに～） 失敗します（試験に～）', meaning: 'Thất bại, trượt', example: '試験に失敗しましたが、次回頑張ります。 (Tôi đã trượt kỳ thi nhưng lần sau sẽ cố gắng.)', chapter: 93}
+{word: 'ごうかくします（しけんに～） 合格します（試験に～）', meaning: 'Đỗ', example: 'ついに試験に合格しました！ (Cuối cùng tôi đã đỗ kỳ thi!)', chapter: 93}
+{word: 'あたります（たからくじが～） 当たります（宝くじが～）', meaning: 'Trúng (số)', example: '宝くじが当たったら旅行します。 (Nếu trúng số, tôi sẽ đi du lịch.)', chapter: 93}
+{word: 'うちます（でんぽうを） 打ちます（電報を）', meaning: 'Gửi (điện báo)', example: '友達の結婚を祝うために電報を打ちます。 (Tôi sẽ gửi điện báo chúc mừng đám cưới của bạn.)', chapter: 94}
