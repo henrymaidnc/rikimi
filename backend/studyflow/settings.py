@@ -5,9 +5,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'your-secret-key-here')
 
-DEBUG = int(os.environ.get('DEBUG', 1))  # Set to 1 for debugging
+DEBUG = int(os.environ.get('DEBUG', 0))  # Set to 0 for production
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost 127.0.0.1 [::1]').split()
+ALLOWED_HOSTS = ['www.rikimi.edu.vn', 'rikimi.edu.vn', 'localhost', '127.0.0.1']
+
+# Security settings
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -95,9 +104,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [
-    "http://13.220.164.76",
-    "http://localhost:8082",
-    "https://www.rikimi.edu.vn"
+    "https://www.rikimi.edu.vn",
+    "https://rikimi.edu.vn",
+    "http://localhost:8082"
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -135,6 +144,6 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Allow all requests for now
+        'rest_framework.permissions.IsAuthenticated',  # Require authentication
     ],
 } 
