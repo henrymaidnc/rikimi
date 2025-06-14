@@ -24,7 +24,7 @@ class Vocabulary(BaseModel):
     )
 
     # Word: could be single kanji or a compound word
-    word = models.CharField(max_length=20)
+    word = models.CharField(max_length=100)
 
     # Meaning (Vietnamese, English, etc.)
     meaning = models.TextField()
