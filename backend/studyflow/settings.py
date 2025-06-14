@@ -102,13 +102,30 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS settings
-CORS_ALLOWED_ORIGINS = [
-    "https://www.rikimi.edu.vn",
-    "https://rikimi.edu.vn",
-    "http://localhost:8082"
+# CSRF Settings
+CSRF_TRUSTED_ORIGINS = [
+    'https://www.rikimi.edu.vn',
+    'https://rikimi.edu.vn',
+    'http://localhost:8082',
 ]
+CSRF_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = False
+CSRF_USE_SESSIONS = False
+CSRF_COOKIE_DOMAIN = '.rikimi.edu.vn'
 
+# Session Settings
+SESSION_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_DOMAIN = '.rikimi.edu.vn'
+
+# CORS Settings
+CORS_ALLOWED_ORIGINS = [
+    'https://www.rikimi.edu.vn',
+    'https://rikimi.edu.vn',
+    'http://localhost:8082',
+]
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_METHODS = [
     'DELETE',
@@ -144,6 +161,6 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',  # Allow read access to unauthenticated users
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
     ],
 }

@@ -28,6 +28,40 @@ interface ImportedChapter {
   description?: string;
 }
 
+// Function to get CSRF token from cookie
+function getCSRFToken() {
+  const name = 'csrftoken';
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// Function to fetch CSRF token
+async function fetchCSRFToken() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/csrf/`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch CSRF token');
+    }
+    return getCSRFToken();
+  } catch (error) {
+    console.error('Error fetching CSRF token:', error);
+    throw error;
+  }
+}
+
 export default function Chapters() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +115,7 @@ export default function Chapters() {
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken() || '',
           },
           credentials: 'include',
         });
@@ -177,15 +212,23 @@ export default function Chapters() {
       return;
     }
 
-    const chapterData = {
-      level: newChapter.level,
-      book_name: newChapter.bookName,
-      chapter_number: parseInt(newChapter.chapterNumber),
-      title: `${newChapter.bookName} - Chapter ${newChapter.chapterNumber}`,
-      description: newChapter.description || "",
-    };
-
     try {
+      // Fetch CSRF token first
+      await fetchCSRFToken();
+      const csrfToken = getCSRFToken();
+      
+      if (!csrfToken) {
+        throw new Error('Failed to get CSRF token');
+      }
+
+      const chapterData = {
+        level: newChapter.level,
+        book_name: newChapter.bookName,
+        chapter_number: parseInt(newChapter.chapterNumber),
+        title: `${newChapter.bookName} - Chapter ${newChapter.chapterNumber}`,
+        description: newChapter.description || "",
+      };
+
       // Create the chapter
       console.log('Creating chapter with data:', chapterData);
       const chapterResponse = await fetch(`${API_BASE_URL}/chapters/`, {
@@ -193,6 +236,7 @@ export default function Chapters() {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
         },
         credentials: 'include',
         body: JSON.stringify(chapterData),
@@ -200,8 +244,7 @@ export default function Chapters() {
 
       if (!chapterResponse.ok) {
         const errorData = await chapterResponse.json();
-        console.error('Chapter creation error:', errorData);
-        throw new Error(`Failed to create chapter: ${chapterResponse.status} - ${JSON.stringify(errorData)}`);
+        throw new Error(errorData.detail || 'Failed to create chapter');
       }
 
       const createdChapter = await chapterResponse.json();
@@ -226,6 +269,7 @@ export default function Chapters() {
             headers: {
               'Accept': 'application/json',
               'Content-Type': 'application/json',
+              'X-CSRFToken': csrfToken,
             },
             credentials: 'include',
             body: JSON.stringify(vocabData),
@@ -290,8 +334,8 @@ export default function Chapters() {
       });
       setDialogOpen(false);
     } catch (error) {
-      console.error("Error in chapter creation process:", error);
-      alert(`Error: ${error.message}`);
+      console.error('Error creating chapter:', error);
+      throw error;
     }
   };
 
@@ -307,6 +351,7 @@ export default function Chapters() {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRFToken() || '',
         },
         credentials: 'include',
       });
@@ -520,6 +565,7 @@ export default function Chapters() {
                   headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken() || '',
                   },
                   credentials: 'include',
                   body: JSON.stringify(chapterData),
@@ -620,6 +666,7 @@ export default function Chapters() {
                   headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken() || '',
                   },
                   credentials: 'include',
                   body: JSON.stringify(vocabData),
