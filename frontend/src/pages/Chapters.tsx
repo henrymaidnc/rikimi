@@ -8,9 +8,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { BookOpen, Plus, Trash2, Search, Download, Upload } from "lucide-react";
+import { BookOpen, Plus, Trash2, Search, Download, Upload, ChevronLeft, ChevronRight } from "lucide-react";
 import { Chapter } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
 import * as XLSX from 'xlsx';
 import { API_BASE_URL } from '@/config';
 
@@ -63,9 +64,18 @@ async function fetchCSRFToken() {
 }
 
 export default function Chapters() {
+  const navigate = useNavigate();
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(() => {
+    // Get the stored page from localStorage
+    const storedPage = localStorage.getItem('chaptersPage');
+    return storedPage ? parseInt(storedPage, 10) : 1;
+  });
+  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize] = useState(10);
   const [newChapter, setNewChapter] = useState({
     description: "",
     level: "",
@@ -88,22 +98,12 @@ export default function Chapters() {
     chapterNumber: "",
     description: ""
   });
-  const [addLoading, setAddLoading] = useState(false);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [importLoading, setImportLoading] = useState(false);
-  const [importProgress, setImportProgress] = useState({
-    currentSheet: 0,
-    totalSheets: 0,
-    currentWord: 0,
-    totalWords: 0,
-    status: ''
-  });
-  const navigate = useNavigate();
+  const [importProgress, setImportProgress] = useState(0);
+  const [isImporting, setIsImporting] = useState(false);
   
-  // Function to fetch all chapters
-  const fetchChapters = async () => {
+  // Define fetchChapters function
+  const fetchChapters = async (page: number = 1) => {
     setLoading(true);
-    setError(null);
     try {
       let allChapters: any[] = [];
       let nextUrl = `${API_BASE_URL}/chapters/`;
@@ -120,48 +120,68 @@ export default function Chapters() {
           credentials: 'include',
         });
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch chapters: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log(`Fetched ${data.results.length} chapters from current page`);
-        allChapters = [...allChapters, ...data.results];
-        nextUrl = data.next;
+      if (!response.ok) {
+        throw new Error(`Failed to fetch chapters: ${response.status} ${response.statusText}`);
       }
 
-      console.log(`Total chapters fetched: ${allChapters.length}`);
+      const data = await response.json();
+      console.log('Fetched chapters:', data); // Debug log
 
-      // Sort chapters by book name and chapter number
-      const sortedChapters = allChapters.sort((a, b) => {
-        if (a.book_name !== b.book_name) {
-          return a.book_name.localeCompare(b.book_name);
-        }
-        return a.chapter_number - b.chapter_number;
-      });
-
-      const transformedChapters = sortedChapters.map(chapter => ({
+      // Transform the API data to match our frontend Chapter type
+      const transformedChapters = data.results.map((chapter: any) => ({
         ...chapter,
         bookName: chapter.book_name,
         chapterNumber: chapter.chapter_number,
-        words: chapter.vocabularies || [],
+        words: chapter.vocabularies || [], // Include vocabulary words
         exercises: []
       }));
-
-      console.log('Setting chapters:', transformedChapters.length);
+      
+      console.log('Transformed chapters:', transformedChapters); // Debug log
       setChapters(transformedChapters);
+      setTotalPages(Math.ceil(data.count / pageSize));
+      setCurrentPage(page);
+      setLoadingProgress(100);
     } catch (error) {
-      console.error('Error fetching chapters:', error);
+      console.error("Error fetching chapters:", error);
       setError(error.message);
     } finally {
       setLoading(false);
     }
   };
-
-  // Fetch chapters on component mount and when chapters change
+  
+  // Add loading progress animation
   useEffect(() => {
-    fetchChapters();
-  }, []);
+    let progressInterval: NodeJS.Timeout;
+    
+    if (loading) {
+      setLoadingProgress(0);
+      progressInterval = setInterval(() => {
+        setLoadingProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 200);
+    }
+
+    return () => {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+    };
+  }, [loading]);
+
+  // Fetch chapters when component mounts or page changes
+  useEffect(() => {
+    fetchChapters(currentPage);
+  }, [currentPage]);
+
+  // Update localStorage when page changes
+  useEffect(() => {
+    localStorage.setItem('chaptersPage', currentPage.toString());
+  }, [currentPage]);
 
   const handleAddWord = () => {
     console.log('Adding word - Current state:', {
@@ -339,14 +359,11 @@ export default function Chapters() {
     }
   };
 
-  const handleDeleteChapter = async (chapterId: number) => {
-    if (!window.confirm('Are you sure you want to delete this chapter?')) {
-      return;
-    }
+  const handleDeleteChapter = async () => {
+    if (!chapterToDelete) return;
 
-    setDeleteLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/chapters/${chapterId}/`, {
+      const response = await fetch(`${API_BASE_URL}/chapters/${chapterToDelete.id}/`, {
         method: 'DELETE',
         headers: {
           'Accept': 'application/json',
@@ -360,12 +377,13 @@ export default function Chapters() {
         throw new Error(`Failed to delete chapter: ${response.status}`);
       }
 
-      await fetchChapters();
+      // Remove the deleted chapter from the list
+      setChapters(chapters.filter(chapter => chapter.id !== chapterToDelete.id));
+      setDeleteDialogOpen(false);
+      setChapterToDelete(null);
     } catch (error) {
-      console.error('Error deleting chapter:', error);
-      setError(error.message);
-    } finally {
-      setDeleteLoading(false);
+      console.error("Error deleting chapter:", error);
+      alert(`Error: ${error.message}`);
     }
   };
 
@@ -443,29 +461,28 @@ export default function Chapters() {
     XLSX.writeFile(wb, 'chapter_import_template.xlsx');
   };
 
-  // Function to handle dialog open/close
-  const handleDialogOpenChange = (open: boolean) => {
-    if (!importLoading) {
-      setImportDialogOpen(open);
-      if (!open) {
-        // Reset states when dialog is closed
-        setSelectedFile(null);
-        setImportingChapter({
-          level: "N5",
-          bookName: "",
-          chapterNumber: "",
-          description: ""
-        });
-        setImportProgress({
-          currentSheet: 0,
-          totalSheets: 0,
-          currentWord: 0,
-          totalWords: 0,
-          status: ''
-        });
-      }
+  // Function to handle file selection
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
     }
   };
+
+  // Function to extract chapter number from sheet name
+  function extractChapterNumber(sheetName: string): number | null {
+    // First, try to extract any number from the sheet name
+    const anyNumber = sheetName.match(/\d+/);
+    if (anyNumber) {
+      const number = parseInt(anyNumber[0]);
+      if (!isNaN(number)) {
+        console.log(`Extracted chapter number ${number} from sheet name: ${sheetName}`);
+        return number;
+      }
+    }
+    console.warn(`Could not extract chapter number from sheet name: ${sheetName}`);
+    return null;
+  }
 
   // Function to import vocabulary
   const handleImportVocabulary = async () => {
@@ -474,14 +491,14 @@ export default function Chapters() {
       return;
     }
 
-    setImportLoading(true);
-    setImportProgress({
-      currentSheet: 0,
-      totalSheets: 0,
-      currentWord: 0,
-      totalWords: 0,
-      status: 'Starting import...'
-    });
+    // Validate required fields
+    if (!importingChapter.level || !importingChapter.bookName) {
+      alert("Please select a level and enter a book name");
+      return;
+    }
+
+    setIsImporting(true);
+    setImportProgress(0);
 
     try {
       // Read the Excel file
@@ -494,43 +511,14 @@ export default function Chapters() {
           console.log('Total sheets found:', workbook.SheetNames.length);
           console.log('Sheet names:', workbook.SheetNames);
           
-          setImportProgress(prev => ({
-            ...prev,
-            totalSheets: workbook.SheetNames.length,
-            status: 'Fetching existing chapters...'
-          }));
-          
-          // First, get all existing chapters for this book
-          const existingChaptersResponse = await fetch(
-            `${API_BASE_URL}/chapters/?book_name=${encodeURIComponent(importingChapter.bookName)}`,
-            {
-              method: 'GET',
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-            }
-          );
-          
-          if (!existingChaptersResponse.ok) {
-            throw new Error('Failed to fetch existing chapters');
-          }
-          
-          const existingChaptersData = await existingChaptersResponse.json();
-          const existingChapters = existingChaptersData.results || [];
-          console.log('Existing chapters:', existingChapters);
+          let totalImported = 0;
+          let totalWords = 0;
+          let createdChapters = 0;
+          let skippedSheets = 0;
           
           // Process each sheet as a separate chapter
           for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex++) {
             const sheetName = workbook.SheetNames[sheetIndex];
-            setImportProgress(prev => ({
-              ...prev,
-              currentSheet: sheetIndex + 1,
-              currentWord: 0,
-              status: `Processing sheet ${sheetIndex + 1}/${workbook.SheetNames.length}: ${sheetName}`
-            }));
-
             console.log(`\nProcessing sheet ${sheetIndex + 1}/${workbook.SheetNames.length}: ${sheetName}`);
             const worksheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
@@ -592,19 +580,10 @@ export default function Chapters() {
             }
 
             // Create vocabulary words for this chapter
-            console.log(`Starting vocabulary import for chapter ${sheetIndex + 1} (${sheetName})`);
-            setImportProgress(prev => ({
-              ...prev,
-              totalWords: jsonData.length,
-              status: `Importing vocabulary for chapter ${sheetIndex + 1}`
-            }));
-
             const vocabPromises = jsonData.map(async (row: any, index: number) => {
-              setImportProgress(prev => ({
-                ...prev,
-                currentWord: index + 1,
-                status: `Importing word ${index + 1}/${jsonData.length} for chapter ${sheetIndex + 1}`
-              }));
+              // Update progress for each word being processed
+              setImportProgress((sheetIndex / workbook.SheetNames.length) * 100 + 
+                ((index / jsonData.length) * (100 / workbook.SheetNames.length)));
 
               // Sanitize and validate the data
               let word = row['Word (Japanese)']?.trim();
@@ -612,43 +591,30 @@ export default function Chapters() {
               let example = row['Example (Optional)']?.trim() || "";
 
               if (!word || !meaning) {
-                console.warn(`Skipping invalid vocabulary entry ${index + 1}/${jsonData.length} in ${sheetName}: ${JSON.stringify(row)}`);
+                console.warn(`Skipping invalid vocabulary entry: ${JSON.stringify(row)}`);
                 return null;
               }
 
               // Clean the word field
-              // Remove brackets and their contents
               word = word.replace(/\[.*?\]/g, '').trim();
               word = word.replace(/「.*?」/g, '').trim();
-              
-              // Handle words with romaji in parentheses
-              // Keep only the Japanese part before the first parenthesis
               const japanesePart = word.split('(')[0].trim();
               if (japanesePart) {
                 word = japanesePart;
               }
-
-              // Handle words with hyphens
-              // Keep only the part before the hyphen
               const beforeHyphen = word.split('-')[0].trim();
               if (beforeHyphen) {
                 word = beforeHyphen;
               }
-              
-              // Remove any extra spaces
               word = word.replace(/\s+/g, ' ').trim();
 
               // Clean the example field
-              // Replace <br> with newline
               example = example.replace(/<br>/g, '\n');
-              // Remove any HTML tags
               example = example.replace(/<[^>]*>/g, '');
-              // Clean up any extra spaces
               example = example.replace(/\s+/g, ' ').trim();
 
-              // Additional validation
               if (!word || word.length === 0) {
-                console.warn(`Skipping entry ${index + 1}/${jsonData.length} with empty word after cleaning: ${JSON.stringify(row)}`);
+                console.warn(`Skipping entry with empty word after cleaning: ${JSON.stringify(row)}`);
                 return null;
               }
 
@@ -660,7 +626,7 @@ export default function Chapters() {
               };
 
               try {
-                console.log(`Importing word ${index + 1}/${jsonData.length}: ${word}`);
+                console.log('Creating vocabulary with data:', vocabData);
                 const vocabResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
                   method: 'POST',
                   headers: {
@@ -674,32 +640,32 @@ export default function Chapters() {
 
                 if (!vocabResponse.ok) {
                   const errorData = await vocabResponse.json();
-                  console.error(`Vocabulary creation error for word ${index + 1}/${jsonData.length}:`, errorData);
-                  console.error('Failed data:', vocabData);
-                  return null; // Skip this word instead of throwing error
+                  console.error('Vocabulary creation error:', errorData);
+                  throw new Error(`Failed to create vocabulary word: ${word}`);
                 }
 
                 return vocabResponse.json();
               } catch (error) {
-                console.error(`Error creating vocabulary for word "${word}" (${index + 1}/${jsonData.length}) in ${sheetName}:`, error);
-                return null; // Skip this word instead of throwing error
+                console.error(`Error creating vocabulary for word "${word}":`, error);
+                return null;
               }
             });
 
             // Filter out null results from failed imports
             const results = await Promise.all(vocabPromises);
             const successfulImports = results.filter(result => result !== null);
-            console.log(`Successfully imported ${successfulImports.length}/${jsonData.length} words for chapter ${sheetIndex + 1} (${sheetName})`);
+            totalImported += successfulImports.length;
+            console.log(`Successfully imported ${successfulImports.length}/${jsonData.length} words for chapter ${chapterNumber} (${sheetName})`);
           }
 
-          setImportProgress(prev => ({
-            ...prev,
-            status: 'Import completed! Refreshing chapters...'
-          }));
-
+          // Set progress to 100% when complete
+          setImportProgress(100);
+          
           // Refresh chapters list after import
+          console.log('Refreshing chapters list...');
           await fetchChapters();
-
+          
+          // Close dialog and reset states
           setImportDialogOpen(false);
           setSelectedFile(null);
           setImportingChapter({
@@ -709,10 +675,12 @@ export default function Chapters() {
             description: ""
           });
           
-          alert("Successfully imported all chapters!");
+          alert(`Successfully imported ${totalImported}/${totalWords} words across ${createdChapters} chapters! (${skippedSheets} sheets skipped)`);
         } catch (error) {
           console.error("Error importing vocabulary:", error);
           alert(`Error: ${error.message}`);
+        } finally {
+          setIsImporting(false);
         }
       };
 
@@ -720,16 +688,13 @@ export default function Chapters() {
     } catch (error) {
       console.error("Error in import process:", error);
       alert(`Error: ${error.message}`);
-    } finally {
-      setImportLoading(false);
-      setImportProgress({
-        currentSheet: 0,
-        totalSheets: 0,
-        currentWord: 0,
-        totalWords: 0,
-        status: ''
-      });
+      setIsImporting(false);
     }
+  };
+
+  // Function to handle navigation to chapter detail
+  const handleViewChapter = (chapterId: number) => {
+    navigate(`/chapters/${chapterId}`);
   };
 
   return (
@@ -748,14 +713,14 @@ export default function Chapters() {
                 <Download className="mr-2 h-4 w-4" />
                 Export Template
               </Button>
-              <Dialog open={importDialogOpen} onOpenChange={handleDialogOpenChange}>
+              <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="flex-1 sm:flex-none">
                     <Upload className="mr-2 h-4 w-4" />
                     Import Vocabulary
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px]">
+                <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Import Vocabulary</DialogTitle>
                     <DialogDescription>
@@ -768,9 +733,8 @@ export default function Chapters() {
                       <div className="space-y-2">
                         <Label htmlFor="importLevel">Level</Label>
                         <Select 
-                          value={importingChapter.level}
+                          value={importingChapter.level} 
                           onValueChange={(value) => setImportingChapter({ ...importingChapter, level: value as "N5" | "N4" | "N3" | "N2" | "N1" })}
-                          disabled={importLoading}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select level" />
@@ -792,11 +756,21 @@ export default function Chapters() {
                           value={importingChapter.bookName}
                           onChange={(e) => setImportingChapter({ ...importingChapter, bookName: e.target.value })}
                           placeholder="e.g., Minna no Nihongo 1"
-                          disabled={importLoading}
                         />
                       </div>
                     </div>
 
+                    <div className="space-y-2">
+                      <Label htmlFor="importChapterNumber">Chapter Number</Label>
+                      <Input
+                        id="importChapterNumber"
+                        type="number"
+                        min={1}
+                        value={importingChapter.chapterNumber}
+                        onChange={(e) => setImportingChapter({ ...importingChapter, chapterNumber: e.target.value })}
+                      />
+                    </div>
+                    
                     <div className="space-y-2">
                       <Label htmlFor="importDescription">Description</Label>
                       <Textarea
@@ -804,65 +778,44 @@ export default function Chapters() {
                         value={importingChapter.description}
                         onChange={(e) => setImportingChapter({ ...importingChapter, description: e.target.value })}
                         placeholder="Brief description of chapter content"
-                        disabled={importLoading}
                       />
                     </div>
+
+                    {isImporting && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Importing vocabulary...</span>
+                          <span className="text-sm text-muted-foreground">{Math.round(importProgress)}%</span>
+                        </div>
+                        <Progress value={importProgress} className="h-2" />
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="importFile">Excel File</Label>
                       <Input
                         id="importFile"
                         type="file"
-                        accept=".xlsx,.xls"
-                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                        disabled={importLoading}
+                        accept=".xlsx,.xls,.csv"
+                        onChange={handleFileSelect}
+                        disabled={isImporting}
                       />
                     </div>
-
-                    {importLoading && (
-                      <div className="mt-4 space-y-4">
-                        <div className="flex justify-between text-sm text-gray-600">
-                          <span>Progress:</span>
-                          <span>
-                            {importProgress.currentSheet}/{importProgress.totalSheets} sheets
-                            {importProgress.totalWords > 0 && ` (${importProgress.currentWord}/${importProgress.totalWords} words)`}
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2.5">
-                          <div
-                            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-                            style={{
-                              width: `${importProgress.totalSheets > 0
-                                ? ((importProgress.currentSheet - 1 + (importProgress.currentWord / importProgress.totalWords)) / importProgress.totalSheets) * 100
-                                : 0}%`
-                            }}
-                          ></div>
-                        </div>
-                        <p className="text-sm text-gray-600 text-center">{importProgress.status}</p>
-                      </div>
-                    )}
                   </div>
-
+                  
                   <DialogFooter>
                     <Button 
                       variant="outline" 
-                      onClick={() => handleDialogOpenChange(false)}
-                      disabled={importLoading}
+                      onClick={() => setImportDialogOpen(false)}
+                      disabled={isImporting}
                     >
                       Cancel
                     </Button>
                     <Button 
                       onClick={handleImportVocabulary}
-                      disabled={!selectedFile || importLoading}
+                      disabled={isImporting || !selectedFile}
                     >
-                      {importLoading ? (
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          <span>Importing...</span>
-                        </div>
-                      ) : (
-                        'Import'
-                      )}
+                      {isImporting ? 'Importing...' : 'Import'}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -1064,95 +1017,124 @@ export default function Chapters() {
         </div>
         
         {loading ? (
-          <div className="flex justify-center items-center min-h-[200px]">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Loading chapters...</span>
+              <span className="text-sm text-muted-foreground">{Math.round(loadingProgress)}%</span>
+            </div>
+            <Progress value={loadingProgress} className="h-2" />
           </div>
         ) : error ? (
           <div className="text-red-500">Error: {error}</div>
-        ) : chapters.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            No chapters found. Click "Add Chapter" to create one.
-          </div>
         ) : (
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {chapters.map((chapter) => (
-              <Card key={chapter.id} className="overflow-hidden">
-                <CardHeader className="bg-secondary/30">
-                  <CardTitle className="text-base">
-                    {chapter.bookName ? (
-                      <>
-                        <span className="font-semibold">{chapter.bookName}</span>
-                        {chapter.chapterNumber && (
-                          <> - Chapter {chapter.chapterNumber}</>
-                        )}
-                        {chapter.level && (
-                          <> - {chapter.level}</>
-                        )}
-                      </>
-                    ) : (
-                      chapter.title
-                    )}
-                  </CardTitle>
-                  <CardDescription className="line-clamp-2">{chapter.description}</CardDescription>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded-full">
-                      {chapter.words?.length || 0} words
-                    </span>
-                    <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">
-                      {chapter.grammar_patterns?.length || 0} grammars
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 sm:p-6">
-                  <div className="flex items-center space-x-2 text-sm mb-4">
-                    <BookOpen className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">
-                      {chapter.exercises.length} Exercise{chapter.exercises.length !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  
-                  {chapter.words && chapter.words.length > 0 && (
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Sample Words:</h4>
-                      {chapter.words.slice(0, 3).map((word, index) => (
-                        <div key={index} className="p-2 bg-secondary/20 rounded-md text-sm">
-                          <strong>{word.word}</strong> - {word.meaning}
-                        </div>
-                      ))}
-                      {chapter.words.length > 3 && (
-                        <div className="text-sm text-muted-foreground text-right">
-                          +{chapter.words.length - 3} more words
-                        </div>
+          <>
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              {chapters.map((chapter) => (
+                <Card key={chapter.id} className="overflow-hidden">
+                  <CardHeader className="bg-secondary/30">
+                    <CardTitle className="text-base">
+                      {chapter.bookName ? (
+                        <>
+                          <span className="font-semibold">{chapter.bookName}</span>
+                          {chapter.chapterNumber && (
+                            <> - Chapter {chapter.chapterNumber}</>
+                          )}
+                          {chapter.level && (
+                            <> - {chapter.level}</>
+                          )}
+                        </>
+                      ) : (
+                        chapter.title
                       )}
+                    </CardTitle>
+                    <CardDescription className="line-clamp-2">{chapter.description}</CardDescription>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded-full">
+                        {chapter.words?.length || 0} words
+                      </span>
+                      <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">
+                        {chapter.grammar_patterns?.length || 0} grammars
+                      </span>
                     </div>
-                  )}
-                </CardContent>
-                <CardFooter className="bg-white pt-0">
-                  <div className="flex flex-wrap gap-2 w-full">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/chapters/${chapter.id}`)}
-                      className="flex-1 sm:flex-none"
-                    >
-                      View Chapter
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        setChapterToDelete(chapter);
-                        setDeleteDialogOpen(true);
-                      }}
-                      className="flex-1 sm:flex-none"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+                  </CardHeader>
+                  <CardContent className="p-4 sm:p-6">
+                    <div className="flex items-center space-x-2 text-sm mb-4">
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        {chapter.exercises.length} Exercise{chapter.exercises.length !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    
+                    {chapter.words && chapter.words.length > 0 && (
+                      <div className="space-y-2">
+                        <h4 className="text-sm font-medium">Sample Words:</h4>
+                        {chapter.words.slice(0, 3).map((word, index) => (
+                          <div key={index} className="p-2 bg-secondary/20 rounded-md text-sm">
+                            <strong>{word.word}</strong> - {word.meaning}
+                          </div>
+                        ))}
+                        {chapter.words.length > 3 && (
+                          <div className="text-sm text-muted-foreground text-right">
+                            +{chapter.words.length - 3} more words
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="bg-white pt-0">
+                    <div className="flex flex-wrap gap-2 w-full">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleViewChapter(chapter.id)}
+                        className="flex-1 sm:flex-none"
+                      >
+                        View Chapter
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          setChapterToDelete(chapter);
+                          setDeleteDialogOpen(true);
+                        }}
+                        className="flex-1 sm:flex-none"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between mt-6">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -1168,7 +1150,7 @@ export default function Chapters() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => handleDeleteChapter(chapterToDelete?.id || 0)}
+              onClick={handleDeleteChapter}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
