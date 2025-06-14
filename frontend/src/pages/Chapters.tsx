@@ -54,13 +54,29 @@ export default function Chapters() {
     chapterNumber: "",
     description: ""
   });
+  const [addLoading, setAddLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importProgress, setImportProgress] = useState({
+    currentSheet: 0,
+    totalSheets: 0,
+    currentWord: 0,
+    totalWords: 0,
+    status: ''
+  });
   const navigate = useNavigate();
   
-  // Fetch chapters when component mounts
-  useEffect(() => {
-    const fetchChapters = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/chapters/`, {
+  // Function to fetch all chapters
+  const fetchChapters = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      let allChapters: any[] = [];
+      let nextUrl = `${API_BASE_URL}/chapters/`;
+
+      while (nextUrl) {
+        console.log('Fetching chapters from:', nextUrl);
+        const response = await fetch(nextUrl, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -70,29 +86,45 @@ export default function Chapters() {
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch chapters: ${response.status} ${response.statusText}`);
+          throw new Error(`Failed to fetch chapters: ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('Fetched chapters:', data); // Debug log
-
-        // Transform the API data to match our frontend Chapter type
-        const transformedChapters = data.results.map((chapter: any) => ({
-          ...chapter,
-          bookName: chapter.book_name,
-          chapterNumber: chapter.chapter_number,
-          words: chapter.vocabularies || [], // Include vocabulary words
-          exercises: []
-        }));
-        setChapters(transformedChapters);
-      } catch (error) {
-        console.error("Error fetching chapters:", error);
-        setError(error.message);
-      } finally {
-        setLoading(false);
+        console.log(`Fetched ${data.results.length} chapters from current page`);
+        allChapters = [...allChapters, ...data.results];
+        nextUrl = data.next;
       }
-    };
 
+      console.log(`Total chapters fetched: ${allChapters.length}`);
+
+      // Sort chapters by book name and chapter number
+      const sortedChapters = allChapters.sort((a, b) => {
+        if (a.book_name !== b.book_name) {
+          return a.book_name.localeCompare(b.book_name);
+        }
+        return a.chapter_number - b.chapter_number;
+      });
+
+      const transformedChapters = sortedChapters.map(chapter => ({
+        ...chapter,
+        bookName: chapter.book_name,
+        chapterNumber: chapter.chapter_number,
+        words: chapter.vocabularies || [],
+        exercises: []
+      }));
+
+      console.log('Setting chapters:', transformedChapters.length);
+      setChapters(transformedChapters);
+    } catch (error) {
+      console.error('Error fetching chapters:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch chapters on component mount and when chapters change
+  useEffect(() => {
     fetchChapters();
   }, []);
 
@@ -263,11 +295,14 @@ export default function Chapters() {
     }
   };
 
-  const handleDeleteChapter = async () => {
-    if (!chapterToDelete) return;
+  const handleDeleteChapter = async (chapterId: number) => {
+    if (!window.confirm('Are you sure you want to delete this chapter?')) {
+      return;
+    }
 
+    setDeleteLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/chapters/${chapterToDelete.id}/`, {
+      const response = await fetch(`${API_BASE_URL}/chapters/${chapterId}/`, {
         method: 'DELETE',
         headers: {
           'Accept': 'application/json',
@@ -280,13 +315,12 @@ export default function Chapters() {
         throw new Error(`Failed to delete chapter: ${response.status}`);
       }
 
-      // Remove the deleted chapter from the list
-      setChapters(chapters.filter(chapter => chapter.id !== chapterToDelete.id));
-      setDeleteDialogOpen(false);
-      setChapterToDelete(null);
+      await fetchChapters();
     } catch (error) {
-      console.error("Error deleting chapter:", error);
-      alert(`Error: ${error.message}`);
+      console.error('Error deleting chapter:', error);
+      setError(error.message);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -364,167 +398,260 @@ export default function Chapters() {
     XLSX.writeFile(wb, 'chapter_import_template.xlsx');
   };
 
-  // Function to handle file selection
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+  // Function to handle dialog open/close
+  const handleDialogOpenChange = (open: boolean) => {
+    if (!importLoading) {
+      setImportDialogOpen(open);
+      if (!open) {
+        // Reset states when dialog is closed
+        setSelectedFile(null);
+        setImportingChapter({
+          level: "N5",
+          bookName: "",
+          chapterNumber: "",
+          description: ""
+        });
+        setImportProgress({
+          currentSheet: 0,
+          totalSheets: 0,
+          currentWord: 0,
+          totalWords: 0,
+          status: ''
+        });
+      }
     }
   };
 
   // Function to import vocabulary
   const handleImportVocabulary = async () => {
-    if (!selectedFile || !importingChapter.bookName || !importingChapter.chapterNumber || !importingChapter.level) {
-      alert("Please select a file and fill in all required chapter details");
+    if (!selectedFile) {
+      alert("Please select a file");
       return;
     }
 
-    console.log('chapterNumber value:', importingChapter.chapterNumber, typeof importingChapter.chapterNumber);
-    if (!importingChapter.chapterNumber || isNaN(Number(importingChapter.chapterNumber)) || Number(importingChapter.chapterNumber) <= 0) {
-      alert('Chapter Number must be a positive integer greater than 0.');
-      return;
-    }
+    setImportLoading(true);
+    setImportProgress({
+      currentSheet: 0,
+      totalSheets: 0,
+      currentWord: 0,
+      totalWords: 0,
+      status: 'Starting import...'
+    });
 
     try {
-      // First, try to find the existing chapter
-      let createdChapter = null;
-      const findChapterRes = await fetch(
-        `${API_BASE_URL}/chapters/?book_name=${encodeURIComponent(importingChapter.bookName)}&chapter_number=${importingChapter.chapterNumber}`,
-        {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        }
-      );
-      const findChapterData = await findChapterRes.json();
-      if (findChapterData.results && findChapterData.results.length > 0) {
-        createdChapter = findChapterData.results[0];
-      } else {
-        // If not found, create the chapter
-        const chapterData = {
-          level: importingChapter.level,
-          book_name: importingChapter.bookName,
-          chapter_number: parseInt(importingChapter.chapterNumber),
-          description: importingChapter.description || "",
-        };
-        const chapterResponse = await fetch(`${API_BASE_URL}/chapters/`, {
-          method: 'POST',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(chapterData),
-        });
-        if (!chapterResponse.ok) {
-          throw new Error(`Failed to create chapter: ${chapterResponse.status}`);
-        }
-        createdChapter = await chapterResponse.json();
-      }
-
       // Read the Excel file
       const reader = new FileReader();
       reader.onload = async (e) => {
         try {
           const fileData = new Uint8Array(e.target?.result as ArrayBuffer);
           const workbook = XLSX.read(fileData, { type: 'array' });
-          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-          // Create vocabulary words
-          const vocabPromises = jsonData.map(async (row: any) => {
-            const vocabData = {
-              word: row['Word (Japanese)'],
-              meaning: row['Meaning (English)'],
-              example: row['Example (Optional)'] || "",
-              chapter: createdChapter.id
-            };
-
-            const vocabResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
-              method: 'POST',
+          
+          console.log('Total sheets found:', workbook.SheetNames.length);
+          console.log('Sheet names:', workbook.SheetNames);
+          
+          setImportProgress(prev => ({
+            ...prev,
+            totalSheets: workbook.SheetNames.length,
+            status: 'Fetching existing chapters...'
+          }));
+          
+          // First, get all existing chapters for this book
+          const existingChaptersResponse = await fetch(
+            `${API_BASE_URL}/chapters/?book_name=${encodeURIComponent(importingChapter.bookName)}`,
+            {
+              method: 'GET',
               headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
               },
               credentials: 'include',
-              body: JSON.stringify(vocabData),
-            });
+            }
+          );
+          
+          if (!existingChaptersResponse.ok) {
+            throw new Error('Failed to fetch existing chapters');
+          }
+          
+          const existingChaptersData = await existingChaptersResponse.json();
+          const existingChapters = existingChaptersData.results || [];
+          console.log('Existing chapters:', existingChapters);
+          
+          // Process each sheet as a separate chapter
+          for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex++) {
+            const sheetName = workbook.SheetNames[sheetIndex];
+            setImportProgress(prev => ({
+              ...prev,
+              currentSheet: sheetIndex + 1,
+              currentWord: 0,
+              status: `Processing sheet ${sheetIndex + 1}/${workbook.SheetNames.length}: ${sheetName}`
+            }));
 
-            if (!vocabResponse.ok) {
-              throw new Error(`Failed to create vocabulary word: ${vocabData.word}`);
+            console.log(`\nProcessing sheet ${sheetIndex + 1}/${workbook.SheetNames.length}: ${sheetName}`);
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet);
+            console.log(`Found ${jsonData.length} vocabulary entries in sheet ${sheetName}`);
+
+            // Check if chapter already exists
+            const existingChapter = existingChapters.find(
+              (ch: any) => ch.chapter_number === sheetIndex + 1
+            );
+
+            let createdChapter = null;
+            if (existingChapter) {
+              console.log(`Found existing chapter ${sheetIndex + 1} (${sheetName}) with ID: ${existingChapter.id}`);
+              createdChapter = existingChapter;
+            } else {
+              setImportProgress(prev => ({
+                ...prev,
+                status: `Creating new chapter for sheet ${sheetName}`
+              }));
+
+              console.log(`Creating new chapter for sheet ${sheetName}`);
+              const chapterData = {
+                level: importingChapter.level,
+                book_name: importingChapter.bookName,
+                chapter_number: sheetIndex + 1,
+                description: `${importingChapter.description || ""} - ${sheetName}`,
+              };
+              
+              try {
+                const chapterResponse = await fetch(`${API_BASE_URL}/chapters/`, {
+                  method: 'POST',
+                  headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                  },
+                  credentials: 'include',
+                  body: JSON.stringify(chapterData),
+                });
+                
+                if (!chapterResponse.ok) {
+                  console.warn(`Failed to create chapter for sheet ${sheetName}: ${chapterResponse.status}`);
+                  const errorData = await chapterResponse.json();
+                  console.error('Chapter creation error:', errorData);
+                  continue;
+                }
+                
+                createdChapter = await chapterResponse.json();
+                console.log(`Created new chapter for sheet ${sheetName} with ID: ${createdChapter.id}`);
+              } catch (error) {
+                console.warn(`Error creating chapter: ${error.message}`);
+                continue;
+              }
             }
 
-            return vocabResponse.json();
-          });
+            if (!createdChapter) {
+              console.warn(`Skipping sheet ${sheetName} - could not create or find chapter`);
+              continue;
+            }
 
-          await Promise.all(vocabPromises);
+            // Create vocabulary words for this chapter
+            console.log(`Starting vocabulary import for chapter ${sheetIndex + 1} (${sheetName})`);
+            setImportProgress(prev => ({
+              ...prev,
+              totalWords: jsonData.length,
+              status: `Importing vocabulary for chapter ${sheetIndex + 1}`
+            }));
 
-          // --- Import grammar from second sheet ---
-          const grammarSheetName = workbook.SheetNames[1];
-          if (grammarSheetName) {
-            const grammarWorksheet = workbook.Sheets[grammarSheetName];
-            const grammarJson = XLSX.utils.sheet_to_json(grammarWorksheet);
+            const vocabPromises = jsonData.map(async (row: any, index: number) => {
+              setImportProgress(prev => ({
+                ...prev,
+                currentWord: index + 1,
+                status: `Importing word ${index + 1}/${jsonData.length} for chapter ${sheetIndex + 1}`
+              }));
 
-            const grammarPromises = grammarJson.map(async (row: any) => {
-              // Collect all example columns dynamically
-              const examples = Object.keys(row)
-                .filter(key => key.toLowerCase().startsWith('example'))
-                .map(key => row[key])
-                .filter(Boolean);
+              // Sanitize and validate the data
+              let word = row['Word (Japanese)']?.trim();
+              let meaning = row['Meaning (English)']?.trim();
+              let example = row['Example (Optional)']?.trim() || "";
 
-              const grammarData = {
-                chapter: createdChapter.id,
-                pattern: row['Pattern'],
-                explanation: row['Explanation'],
-                examples: examples,
-              };
-
-              const grammarResponse = await fetch(`${API_BASE_URL}/grammar_patterns/`, {
-                method: 'POST',
-                headers: {
-                  'Accept': 'application/json',
-                  'Content-Type': 'application/json',
-                },
-                credentials: 'include',
-                body: JSON.stringify(grammarData),
-              });
-
-              if (!grammarResponse.ok) {
-                throw new Error(`Failed to create grammar pattern: ${grammarData.pattern}`);
+              if (!word || !meaning) {
+                console.warn(`Skipping invalid vocabulary entry ${index + 1}/${jsonData.length} in ${sheetName}: ${JSON.stringify(row)}`);
+                return null;
               }
 
-              return grammarResponse.json();
+              // Clean the word field
+              // Remove brackets and their contents
+              word = word.replace(/\[.*?\]/g, '').trim();
+              word = word.replace(/「.*?」/g, '').trim();
+              
+              // Handle words with romaji in parentheses
+              // Keep only the Japanese part before the first parenthesis
+              const japanesePart = word.split('(')[0].trim();
+              if (japanesePart) {
+                word = japanesePart;
+              }
+
+              // Handle words with hyphens
+              // Keep only the part before the hyphen
+              const beforeHyphen = word.split('-')[0].trim();
+              if (beforeHyphen) {
+                word = beforeHyphen;
+              }
+              
+              // Remove any extra spaces
+              word = word.replace(/\s+/g, ' ').trim();
+
+              // Clean the example field
+              // Replace <br> with newline
+              example = example.replace(/<br>/g, '\n');
+              // Remove any HTML tags
+              example = example.replace(/<[^>]*>/g, '');
+              // Clean up any extra spaces
+              example = example.replace(/\s+/g, ' ').trim();
+
+              // Additional validation
+              if (!word || word.length === 0) {
+                console.warn(`Skipping entry ${index + 1}/${jsonData.length} with empty word after cleaning: ${JSON.stringify(row)}`);
+                return null;
+              }
+
+              const vocabData = {
+                word: word,
+                meaning: meaning,
+                example: example,
+                chapter: createdChapter.id
+              };
+
+              try {
+                console.log(`Importing word ${index + 1}/${jsonData.length}: ${word}`);
+                const vocabResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
+                  method: 'POST',
+                  headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                  },
+                  credentials: 'include',
+                  body: JSON.stringify(vocabData),
+                });
+
+                if (!vocabResponse.ok) {
+                  const errorData = await vocabResponse.json();
+                  console.error(`Vocabulary creation error for word ${index + 1}/${jsonData.length}:`, errorData);
+                  console.error('Failed data:', vocabData);
+                  return null; // Skip this word instead of throwing error
+                }
+
+                return vocabResponse.json();
+              } catch (error) {
+                console.error(`Error creating vocabulary for word "${word}" (${index + 1}/${jsonData.length}) in ${sheetName}:`, error);
+                return null; // Skip this word instead of throwing error
+              }
             });
 
-            await Promise.all(grammarPromises);
+            // Filter out null results from failed imports
+            const results = await Promise.all(vocabPromises);
+            const successfulImports = results.filter(result => result !== null);
+            console.log(`Successfully imported ${successfulImports.length}/${jsonData.length} words for chapter ${sheetIndex + 1} (${sheetName})`);
           }
 
-          // Refresh chapters list
-          const updatedResponse = await fetch(`${API_BASE_URL}/chapters/`, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'application/json',
-            },
-            credentials: 'include',
-          });
-
-          if (!updatedResponse.ok) {
-            throw new Error('Failed to fetch updated chapters');
-          }
-
-          const updatedData = await updatedResponse.json();
-          const transformedChapters = updatedData.results.map((chapter: any) => ({
-            ...chapter,
-            bookName: chapter.book_name,
-            chapterNumber: chapter.chapter_number,
-            words: [],
-            exercises: []
+          setImportProgress(prev => ({
+            ...prev,
+            status: 'Import completed! Refreshing chapters...'
           }));
-          setChapters(transformedChapters);
+
+          // Refresh chapters list after import
+          await fetchChapters();
 
           setImportDialogOpen(false);
           setSelectedFile(null);
@@ -534,6 +661,8 @@ export default function Chapters() {
             chapterNumber: "",
             description: ""
           });
+          
+          alert("Successfully imported all chapters!");
         } catch (error) {
           console.error("Error importing vocabulary:", error);
           alert(`Error: ${error.message}`);
@@ -544,6 +673,15 @@ export default function Chapters() {
     } catch (error) {
       console.error("Error in import process:", error);
       alert(`Error: ${error.message}`);
+    } finally {
+      setImportLoading(false);
+      setImportProgress({
+        currentSheet: 0,
+        totalSheets: 0,
+        currentWord: 0,
+        totalWords: 0,
+        status: ''
+      });
     }
   };
 
@@ -563,14 +701,14 @@ export default function Chapters() {
                 <Download className="mr-2 h-4 w-4" />
                 Export Template
               </Button>
-              <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+              <Dialog open={importDialogOpen} onOpenChange={handleDialogOpenChange}>
                 <DialogTrigger asChild>
                   <Button variant="outline" className="flex-1 sm:flex-none">
                     <Upload className="mr-2 h-4 w-4" />
                     Import Vocabulary
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-[425px]">
                   <DialogHeader>
                     <DialogTitle>Import Vocabulary</DialogTitle>
                     <DialogDescription>
@@ -583,8 +721,9 @@ export default function Chapters() {
                       <div className="space-y-2">
                         <Label htmlFor="importLevel">Level</Label>
                         <Select 
-                          value={importingChapter.level} 
+                          value={importingChapter.level}
                           onValueChange={(value) => setImportingChapter({ ...importingChapter, level: value as "N5" | "N4" | "N3" | "N2" | "N1" })}
+                          disabled={importLoading}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Select level" />
@@ -606,21 +745,11 @@ export default function Chapters() {
                           value={importingChapter.bookName}
                           onChange={(e) => setImportingChapter({ ...importingChapter, bookName: e.target.value })}
                           placeholder="e.g., Minna no Nihongo 1"
+                          disabled={importLoading}
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="importChapterNumber">Chapter Number</Label>
-                      <Input
-                        id="importChapterNumber"
-                        type="number"
-                        min={1}
-                        value={importingChapter.chapterNumber}
-                        onChange={(e) => setImportingChapter({ ...importingChapter, chapterNumber: e.target.value })}
-                      />
-                    </div>
-                    
                     <div className="space-y-2">
                       <Label htmlFor="importDescription">Description</Label>
                       <Textarea
@@ -628,6 +757,7 @@ export default function Chapters() {
                         value={importingChapter.description}
                         onChange={(e) => setImportingChapter({ ...importingChapter, description: e.target.value })}
                         placeholder="Brief description of chapter content"
+                        disabled={importLoading}
                       />
                     </div>
 
@@ -636,21 +766,56 @@ export default function Chapters() {
                       <Input
                         id="importFile"
                         type="file"
-                        accept=".xlsx,.xls,.csv"
-                        onChange={handleFileSelect}
+                        accept=".xlsx,.xls"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                        disabled={importLoading}
                       />
                     </div>
+
+                    {importLoading && (
+                      <div className="mt-4 space-y-4">
+                        <div className="flex justify-between text-sm text-gray-600">
+                          <span>Progress:</span>
+                          <span>
+                            {importProgress.currentSheet}/{importProgress.totalSheets} sheets
+                            {importProgress.totalWords > 0 && ` (${importProgress.currentWord}/${importProgress.totalWords} words)`}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                          <div
+                            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                            style={{
+                              width: `${importProgress.totalSheets > 0
+                                ? ((importProgress.currentSheet - 1 + (importProgress.currentWord / importProgress.totalWords)) / importProgress.totalSheets) * 100
+                                : 0}%`
+                            }}
+                          ></div>
+                        </div>
+                        <p className="text-sm text-gray-600 text-center">{importProgress.status}</p>
+                      </div>
+                    )}
                   </div>
-                  
+
                   <DialogFooter>
                     <Button 
                       variant="outline" 
-                      onClick={() => setImportDialogOpen(false)}
+                      onClick={() => handleDialogOpenChange(false)}
+                      disabled={importLoading}
                     >
                       Cancel
                     </Button>
-                    <Button onClick={handleImportVocabulary}>
-                      Import
+                    <Button 
+                      onClick={handleImportVocabulary}
+                      disabled={!selectedFile || importLoading}
+                    >
+                      {importLoading ? (
+                        <div className="flex items-center gap-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          <span>Importing...</span>
+                        </div>
+                      ) : (
+                        'Import'
+                      )}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -852,9 +1017,15 @@ export default function Chapters() {
         </div>
         
         {loading ? (
-          <div>Loading chapters...</div>
+          <div className="flex justify-center items-center min-h-[200px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          </div>
         ) : error ? (
           <div className="text-red-500">Error: {error}</div>
+        ) : chapters.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No chapters found. Click "Add Chapter" to create one.
+          </div>
         ) : (
           <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {chapters.map((chapter) => (
@@ -950,7 +1121,7 @@ export default function Chapters() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteChapter}
+              onClick={() => handleDeleteChapter(chapterToDelete?.id || 0)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
