@@ -13,7 +13,7 @@ import { Chapter } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import * as XLSX from 'xlsx';
-import { API_BASE_URL } from '@/config';
+import { API_BASE_URL, getDefaultHeaders } from '@/config';
 
 
 interface WordData {
@@ -517,10 +517,7 @@ export default function Chapters() {
             `${API_BASE_URL}/chapters/?book_name=${encodeURIComponent(importingChapter.bookName)}`,
             {
               method: 'GET',
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
+              headers: getDefaultHeaders(),
               credentials: 'include',
             }
           );
@@ -555,7 +552,6 @@ export default function Chapters() {
               ...prev,
               currentSheet: sheetIndex + 1,
               totalWords: jsonData.length,
-              currentWord: 0,
               status: `Processing sheet ${sheetName} (Chapter ${chapterNumber})`
             }));
 
@@ -583,13 +579,9 @@ export default function Chapters() {
               };
               
               try {
-                console.log('Creating chapter with data:', chapterData);
                 const chapterResponse = await fetch(`${API_BASE_URL}/chapters/`, {
                   method: 'POST',
-                  headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                  },
+                  headers: getDefaultHeaders(),
                   credentials: 'include',
                   body: JSON.stringify(chapterData),
                 });
@@ -602,130 +594,91 @@ export default function Chapters() {
                 }
                 
                 createdChapter = await chapterResponse.json();
-                console.log(`Successfully created chapter ${chapterNumber} for sheet ${sheetName} with ID: ${createdChapter.id}`);
+                console.log(`Created new chapter ${chapterNumber} for sheet ${sheetName} with ID: ${createdChapter.id}`);
                 createdChapters++;
-
-                // Verify the chapter was created by fetching it
-                const verifyResponse = await fetch(`${API_BASE_URL}/chapters/${createdChapter.id}/`, {
-                  method: 'GET',
-                  headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                  },
-                  credentials: 'include',
-                });
-
-                if (!verifyResponse.ok) {
-                  console.warn(`Warning: Could not verify created chapter ${createdChapter.id}: ${verifyResponse.status}`);
-                } else {
-                  const verifiedChapter = await verifyResponse.json();
-                  console.log('Verified chapter data:', verifiedChapter);
-                }
               } catch (error) {
                 console.warn(`Error creating chapter ${chapterNumber}: ${error.message}`);
                 continue;
               }
             }
 
-            // Process vocabulary entries
-            let validEntries = 0;
-            for (let i = 0; i < jsonData.length; i++) {
-              const row = jsonData[i];
+            // Create vocabulary words
+            if (createdChapter && jsonData.length > 0) {
               setImportProgress(prev => ({
                 ...prev,
-                currentWord: i + 1,
-                status: `Processing word ${i + 1}/${jsonData.length} in ${sheetName}`
+                status: `Importing vocabulary for chapter ${chapterNumber}`
               }));
 
-              // Get all possible column names for word and meaning
-              const wordColumn = Object.keys(row).find(key => 
-                key.toLowerCase().includes('word') || 
-                key.toLowerCase().includes('từ') ||
-                key.toLowerCase().includes('vocabulary')
-              );
-              
-              const meaningColumn = Object.keys(row).find(key => 
-                key.toLowerCase().includes('meaning') || 
-                key.toLowerCase().includes('nghĩa') ||
-                key.toLowerCase().includes('definition')
-              );
+              for (let i = 0; i < jsonData.length; i++) {
+                const row = jsonData[i] as Record<string, any>;
+                setImportProgress(prev => ({
+                  ...prev,
+                  currentWord: i + 1,
+                  status: `Importing word ${i + 1}/${jsonData.length} for chapter ${chapterNumber}`
+                }));
 
-              const word = wordColumn ? row[wordColumn] : undefined;
-              const meaning = meaningColumn ? row[meaningColumn] : undefined;
+                // Find word and meaning columns
+                const wordColumn = Object.keys(row).find(key => 
+                  key.toLowerCase().includes('word') || 
+                  key.toLowerCase().includes('từ') || 
+                  key.toLowerCase().includes('vocabulary')
+                );
+                const meaningColumn = Object.keys(row).find(key => 
+                  key.toLowerCase().includes('meaning') || 
+                  key.toLowerCase().includes('nghĩa') || 
+                  key.toLowerCase().includes('definition')
+                );
 
-              console.log(`Processing row ${i + 1}:`, {
-                word,
-                meaning,
-                wordColumn,
-                meaningColumn,
-                row: row,
-                chapterId: createdChapter.id
-              });
-
-              if (!word || !meaning) {
-                console.warn(`Skipping row ${i + 1} in ${sheetName} - missing required fields. Word: "${word}", Meaning: "${meaning}"`);
-                continue;
-              }
-
-              try {
-                const vocabularyData = {
-                  chapter: createdChapter.id,
-                  word: word.trim(),
-                  meaning: meaning.trim(),
-                  example: (row['Example'] || row['example'] || row['Ví dụ'] || row['ví dụ'] || '').trim(),
-                  example_translation: (row['Translation'] || row['translation'] || row['Dịch'] || row['dịch'] || '').trim(),
-                };
-
-                console.log(`Creating vocabulary for word "${word}" in chapter ${chapterNumber} (ID: ${createdChapter.id}):`, vocabularyData);
-
-                const vocabularyResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
-                  method: 'POST',
-                  headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                  },
-                  credentials: 'include',
-                  body: JSON.stringify(vocabularyData),
-                });
-
-                if (!vocabularyResponse.ok) {
-                  const errorData = await vocabularyResponse.json();
-                  console.warn(`Failed to create vocabulary for word "${word}" in ${sheetName}:`, {
-                    status: vocabularyResponse.status,
-                    error: errorData,
-                    chapterId: createdChapter.id
-                  });
+                if (!wordColumn || !meaningColumn) {
+                  console.warn(`Skipping row ${i + 1} in sheet ${sheetName}: Missing word or meaning column`);
                   continue;
                 }
 
-                const createdVocabulary = await vocabularyResponse.json();
-                console.log(`Successfully created vocabulary for word "${word}" in chapter ${chapterNumber} (ID: ${createdChapter.id}):`, createdVocabulary);
+                const word = String(row[wordColumn]).trim();
+                const meaning = String(row[meaningColumn]).trim();
 
-                validEntries++;
-                totalImported++;
-              } catch (error) {
-                console.warn(`Error creating vocabulary for word "${word}" in ${sheetName}: ${error.message}`);
+                if (!word || !meaning) {
+                  console.warn(`Skipping row ${i + 1} in sheet ${sheetName}: Empty word or meaning`);
+                  continue;
+                }
+
+                try {
+                  const vocabularyData = {
+                    word: word,
+                    meaning: meaning,
+                    example: (row.example || row.translation || "") as string,
+                    chapter: createdChapter.id
+                  };
+
+                  const vocabularyResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
+                    method: 'POST',
+                    headers: getDefaultHeaders(),
+                    credentials: 'include',
+                    body: JSON.stringify(vocabularyData),
+                  });
+
+                  if (!vocabularyResponse.ok) {
+                    console.warn(`Failed to create vocabulary for word "${word}": ${vocabularyResponse.status}`);
+                    continue;
+                  }
+
+                  totalImported++;
+                } catch (error) {
+                  console.warn(`Error creating vocabulary for word "${word}": ${error.message}`);
+                  continue;
+                }
               }
-            }
-
-            if (validEntries === 0) {
-              console.warn(`No valid vocabulary entries found in ${sheetName}. Total rows: ${jsonData.length}`);
-              skippedSheets++;
-            } else {
-              console.log(`Successfully imported ${validEntries} vocabulary entries in chapter ${chapterNumber}`);
-              totalWords += validEntries;
             }
           }
 
-          // Show success message
           setImportProgress(prev => ({
             ...prev,
-            status: `Import completed successfully! Imported ${totalImported} words across ${createdChapters} chapters. ${skippedSheets} sheets were skipped.`
+            status: `Import completed. Created ${createdChapters} chapters, imported ${totalImported} words.`
           }));
 
           // Refresh the chapters list
-          await fetchChapters();
-
+          fetchChapters();
+          
           // Close the import dialog after a delay
           setTimeout(() => {
             setImportDialogOpen(false);
@@ -737,7 +690,7 @@ export default function Chapters() {
               totalWords: 0,
               status: ''
             });
-          }, 3000);
+          }, 2000);
 
         } catch (error) {
           console.error("Error importing vocabulary:", error);
@@ -748,7 +701,7 @@ export default function Chapters() {
           setImporting(false);
         }
       };
-
+      
       reader.readAsArrayBuffer(selectedFile);
     } catch (error) {
       console.error("Error reading file:", error);
@@ -839,18 +792,8 @@ export default function Chapters() {
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="importChapterNumber">Chapter Number</Label>
-                      <Input
-                        id="importChapterNumber"
-                        type="number"
-                        min={1}
-                        value={importingChapter.chapterNumber}
-                        onChange={(e) => setImportingChapter({ ...importingChapter, chapterNumber: e.target.value })}
-                      />
-                    </div>
                     
-                    <div className="space-y-2">
+                    {/* <div className="space-y-2">
                       <Label htmlFor="importDescription">Description</Label>
                       <Textarea
                         id="importDescription"
@@ -858,7 +801,7 @@ export default function Chapters() {
                         onChange={(e) => setImportingChapter({ ...importingChapter, description: e.target.value })}
                         placeholder="Brief description of chapter content"
                       />
-                    </div>
+                    </div> */}
 
                     {importing && (
                       <div className="space-y-2">

@@ -8,7 +8,6 @@ export const API_BASE_URL = isDevelopment
   
 
 export const getCSRFToken = () => {
-  // Get CSRF token from cookie
   const name = 'csrftoken';
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
@@ -25,16 +24,28 @@ export const getCSRFToken = () => {
 };
 
 export const getDefaultHeaders = () => {
-  const headers: Record<string, string> = {
+  return {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
+    'X-CSRFToken': getCSRFToken() || '',
   };
+};
 
-  const csrfToken = getCSRFToken();
-  if (csrfToken) {
-    headers['X-CSRFToken'] = csrfToken;
+export const fetchCSRFToken = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/csrf/`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch CSRF token');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error fetching CSRF token:', error);
+    throw error;
   }
-
-  return headers;
 };
   
