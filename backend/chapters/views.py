@@ -1,5 +1,6 @@
 from rest_framework import viewsets, filters
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from .models import Chapter, Vocabulary, GrammarPattern, Note
 from .serializers import ChapterSerializer, VocabularySerializer, GrammarPatternSerializer, NoteSerializer
@@ -8,6 +9,7 @@ from .serializers import ChapterSerializer, VocabularySerializer, GrammarPattern
 class ChapterViewSet(viewsets.ModelViewSet):
     queryset = Chapter.objects.all()
     serializer_class = ChapterSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['level', 'book_name']
     search_fields = ['title', 'description']
@@ -17,6 +19,7 @@ class ChapterViewSet(viewsets.ModelViewSet):
 class VocabularyViewSet(viewsets.ModelViewSet):
     queryset = Vocabulary.objects.all()
     serializer_class = VocabularySerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['chapter', 'chapter__level']
     search_fields = ['word', 'meaning']
@@ -26,6 +29,7 @@ class VocabularyViewSet(viewsets.ModelViewSet):
 class GrammarPatternViewSet(viewsets.ModelViewSet):
     queryset = GrammarPattern.objects.all()
     serializer_class = GrammarPatternSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['chapter', 'chapter__level']
     search_fields = ['pattern', 'explanation']
@@ -42,6 +46,7 @@ class GrammarPatternViewSet(viewsets.ModelViewSet):
 class NoteViewSet(viewsets.ModelViewSet):
     queryset = Note.objects.all()
     serializer_class = NoteSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'content']
     ordering_fields = ['created_at', 'updated_at'] 

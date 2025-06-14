@@ -29,6 +29,40 @@ interface ImportedChapter {
   description?: string;
 }
 
+// Function to get CSRF token from cookie
+function getCSRFToken() {
+  const name = 'csrftoken';
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+// Function to fetch CSRF token
+async function fetchCSRFToken() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/csrf/`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch CSRF token');
+    }
+    return getCSRFToken();
+  } catch (error) {
+    console.error('Error fetching CSRF token:', error);
+    throw error;
+  }
+}
+
 export default function Chapters() {
   const navigate = useNavigate();
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -71,14 +105,20 @@ export default function Chapters() {
   const fetchChapters = async (page: number = 1) => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/chapters/?page=${page}&page_size=${pageSize}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
+      let allChapters: any[] = [];
+      let nextUrl = `${API_BASE_URL}/chapters/`;
+
+      while (nextUrl) {
+        console.log('Fetching chapters from:', nextUrl);
+        const response = await fetch(nextUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken() || '',
+          },
+          credentials: 'include',
+        });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch chapters: ${response.status} ${response.statusText}`);
@@ -192,15 +232,23 @@ export default function Chapters() {
       return;
     }
 
-    const chapterData = {
-      level: newChapter.level,
-      book_name: newChapter.bookName,
-      chapter_number: parseInt(newChapter.chapterNumber),
-      title: `${newChapter.bookName} - Chapter ${newChapter.chapterNumber}`,
-      description: newChapter.description || "",
-    };
-
     try {
+      // Fetch CSRF token first
+      await fetchCSRFToken();
+      const csrfToken = getCSRFToken();
+      
+      if (!csrfToken) {
+        throw new Error('Failed to get CSRF token');
+      }
+
+      const chapterData = {
+        level: newChapter.level,
+        book_name: newChapter.bookName,
+        chapter_number: parseInt(newChapter.chapterNumber),
+        title: `${newChapter.bookName} - Chapter ${newChapter.chapterNumber}`,
+        description: newChapter.description || "",
+      };
+
       // Create the chapter
       console.log('Creating chapter with data:', chapterData);
       const chapterResponse = await fetch(`${API_BASE_URL}/chapters/`, {
@@ -208,6 +256,7 @@ export default function Chapters() {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
         },
         credentials: 'include',
         body: JSON.stringify(chapterData),
@@ -215,8 +264,7 @@ export default function Chapters() {
 
       if (!chapterResponse.ok) {
         const errorData = await chapterResponse.json();
-        console.error('Chapter creation error:', errorData);
-        throw new Error(`Failed to create chapter: ${chapterResponse.status} - ${JSON.stringify(errorData)}`);
+        throw new Error(errorData.detail || 'Failed to create chapter');
       }
 
       const createdChapter = await chapterResponse.json();
@@ -241,6 +289,7 @@ export default function Chapters() {
             headers: {
               'Accept': 'application/json',
               'Content-Type': 'application/json',
+              'X-CSRFToken': csrfToken,
             },
             credentials: 'include',
             body: JSON.stringify(vocabData),
@@ -305,8 +354,8 @@ export default function Chapters() {
       });
       setDialogOpen(false);
     } catch (error) {
-      console.error("Error in chapter creation process:", error);
-      alert(`Error: ${error.message}`);
+      console.error('Error creating chapter:', error);
+      throw error;
     }
   };
 
@@ -319,6 +368,7 @@ export default function Chapters() {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'X-CSRFToken': getCSRFToken() || '',
         },
         credentials: 'include',
       });
@@ -470,57 +520,64 @@ export default function Chapters() {
           for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex++) {
             const sheetName = workbook.SheetNames[sheetIndex];
             console.log(`\nProcessing sheet ${sheetIndex + 1}/${workbook.SheetNames.length}: ${sheetName}`);
-            
-            // Update progress based on sheet processing
-            setImportProgress((sheetIndex / workbook.SheetNames.length) * 100);
-            
-            // Extract chapter number from sheet name
-            const chapterNumber = extractChapterNumber(sheetName);
-            if (!chapterNumber) {
-              console.warn(`Could not extract chapter number from sheet name: ${sheetName}, skipping...`);
-              skippedSheets++;
-              continue;
-            }
-
-            console.log(`Processing chapter ${chapterNumber} for book ${importingChapter.bookName}`);
-
-            // Always create a new chapter for each sheet
-            console.log(`Creating new chapter for sheet ${sheetName}`);
-            const chapterData = {
-              level: importingChapter.level,
-              book_name: importingChapter.bookName,
-              chapter_number: chapterNumber,
-              title: `${importingChapter.bookName} - Chapter ${chapterNumber}`,
-              description: `${importingChapter.description || ""} - ${sheetName}`,
-            };
-
-            console.log('Creating chapter with data:', chapterData);
-
-            const chapterResponse = await fetch(`${API_BASE_URL}/chapters/`, {
-              method: 'POST',
-              headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include',
-              body: JSON.stringify(chapterData),
-            });
-
-            if (!chapterResponse.ok) {
-              const errorData = await chapterResponse.json();
-              console.error('Chapter creation error:', errorData);
-              throw new Error(`Failed to create chapter: ${chapterResponse.status} - ${JSON.stringify(errorData)}`);
-            }
-
-            const createdChapter = await chapterResponse.json();
-            console.log(`Created new chapter for sheet ${sheetName} with ID: ${createdChapter.id}`);
-            createdChapters++;
-
-            // Process vocabulary from the sheet
             const worksheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
             console.log(`Found ${jsonData.length} vocabulary entries in sheet ${sheetName}`);
-            totalWords += jsonData.length;
+
+            // Check if chapter already exists
+            const existingChapter = existingChapters.find(
+              (ch: any) => ch.chapter_number === sheetIndex + 1
+            );
+
+            let createdChapter = null;
+            if (existingChapter) {
+              console.log(`Found existing chapter ${sheetIndex + 1} (${sheetName}) with ID: ${existingChapter.id}`);
+              createdChapter = existingChapter;
+            } else {
+              setImportProgress(prev => ({
+                ...prev,
+                status: `Creating new chapter for sheet ${sheetName}`
+              }));
+
+              console.log(`Creating new chapter for sheet ${sheetName}`);
+              const chapterData = {
+                level: importingChapter.level,
+                book_name: importingChapter.bookName,
+                chapter_number: sheetIndex + 1,
+                description: `${importingChapter.description || ""} - ${sheetName}`,
+              };
+              
+              try {
+                const chapterResponse = await fetch(`${API_BASE_URL}/chapters/`, {
+                  method: 'POST',
+                  headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken() || '',
+                  },
+                  credentials: 'include',
+                  body: JSON.stringify(chapterData),
+                });
+                
+                if (!chapterResponse.ok) {
+                  console.warn(`Failed to create chapter for sheet ${sheetName}: ${chapterResponse.status}`);
+                  const errorData = await chapterResponse.json();
+                  console.error('Chapter creation error:', errorData);
+                  continue;
+                }
+                
+                createdChapter = await chapterResponse.json();
+                console.log(`Created new chapter for sheet ${sheetName} with ID: ${createdChapter.id}`);
+              } catch (error) {
+                console.warn(`Error creating chapter: ${error.message}`);
+                continue;
+              }
+            }
+
+            if (!createdChapter) {
+              console.warn(`Skipping sheet ${sheetName} - could not create or find chapter`);
+              continue;
+            }
 
             // Create vocabulary words for this chapter
             const vocabPromises = jsonData.map(async (row: any, index: number) => {
@@ -575,6 +632,7 @@ export default function Chapters() {
                   headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
+                    'X-CSRFToken': getCSRFToken() || '',
                   },
                   credentials: 'include',
                   body: JSON.stringify(vocabData),

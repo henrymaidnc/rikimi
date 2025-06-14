@@ -11,6 +11,8 @@ from practice.views import (
     VocabularyInputTestQuestionViewSet
 )
 from .views import health_check
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.http import JsonResponse
 
 router = DefaultRouter()
 router.register(r'chapters', ChapterViewSet)
@@ -24,9 +26,16 @@ router.register(r'input-test-attempts', InputTestAttemptViewSet, basename='input
 router.register(r'vocabulary-input-test-questions', VocabularyInputTestQuestionViewSet, basename='vocabulary-input-test-question')
 router.register(r'notes', NoteViewSet)
 
+
+@ensure_csrf_cookie
+def get_csrf_token(request):
+    return JsonResponse({'detail': 'CSRF cookie set'})
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     path('api-auth/', include('rest_framework.urls')),
     path('health/', health_check, name='health_check'),
-] 
+    path('csrf/', get_csrf_token, name='csrf'),
+]
