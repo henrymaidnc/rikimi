@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     # Local apps
+    'common.apps.CommonConfig',
     'chapters.apps.ChaptersConfig',
     'practice.apps.PracticeConfig',
 ]
