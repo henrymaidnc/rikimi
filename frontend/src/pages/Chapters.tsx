@@ -75,7 +75,7 @@ export default function Chapters() {
     return storedPage ? parseInt(storedPage, 10) : 1;
   });
   const [totalPages, setTotalPages] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize] = useState(25); // 5 rows × 5 chapters per row
   const [newChapter, setNewChapter] = useState({
     description: "",
     level: "",
@@ -98,18 +98,27 @@ export default function Chapters() {
     chapterNumber: "",
     description: ""
   });
-  const [importProgress, setImportProgress] = useState(0);
-  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState({
+    currentSheet: 0,
+    totalSheets: 0,
+    currentWord: 0,
+    totalWords: 0,
+    status: ''
+  });
+  const [importing, setImporting] = useState(false);
+  const [allChapters, setAllChapters] = useState<any[]>([]);
   
   // Define fetchChapters function
-  const fetchChapters = async (page: number = 1) => {
+  const fetchChapters = async () => {
     setLoading(true);
     try {
-      let allChapters: any[] = [];
-      let nextUrl = `${API_BASE_URL}/chapters/`;
+      console.log('Fetching all chapters...');
+      let allChaptersData: any[] = [];
+      let nextUrl = `${API_BASE_URL}/chapters/?ordering=book_name,chapter_number`;
 
+      // Fetch all pages of chapters
       while (nextUrl) {
-        console.log('Fetching chapters from:', nextUrl);
+        console.log('Fetching from:', nextUrl);
         const response = await fetch(nextUrl, {
           method: 'GET',
           headers: {
@@ -120,26 +129,47 @@ export default function Chapters() {
           credentials: 'include',
         });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch chapters: ${response.status} ${response.statusText}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch chapters: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('Fetched page of chapters:', {
+          count: data.count,
+          results: data.results.length,
+          next: data.next
+        });
+
+        // Transform the API data to match our frontend Chapter type
+        const transformedChapters = data.results.map((chapter: any) => ({
+          id: chapter.id,
+          bookName: chapter.book_name,
+          chapterNumber: chapter.chapter_number,
+          level: chapter.level,
+          description: chapter.description,
+          words: chapter.vocabularies || [],
+          exercises: [],
+          grammar_patterns: chapter.grammar_patterns || []
+        }));
+
+        allChaptersData = [...allChaptersData, ...transformedChapters];
+        nextUrl = data.next;
       }
 
-      const data = await response.json();
-      console.log('Fetched chapters:', data); // Debug log
+      // Sort all chapters by book name and chapter number
+      const sortedChapters = allChaptersData.sort((a, b) => {
+        if (a.bookName !== b.bookName) {
+          return a.bookName.localeCompare(b.bookName);
+        }
+        return a.chapterNumber - b.chapterNumber;
+      });
 
-      // Transform the API data to match our frontend Chapter type
-      const transformedChapters = data.results.map((chapter: any) => ({
-        ...chapter,
-        bookName: chapter.book_name,
-        chapterNumber: chapter.chapter_number,
-        words: chapter.vocabularies || [], // Include vocabulary words
-        exercises: []
-      }));
+      console.log('Total chapters fetched:', sortedChapters.length);
+      console.log('Books found:', [...new Set(sortedChapters.map(c => c.bookName))]);
       
-      console.log('Transformed chapters:', transformedChapters); // Debug log
-      setChapters(transformedChapters);
-      setTotalPages(Math.ceil(data.count / pageSize));
-      setCurrentPage(page);
+      setAllChapters(sortedChapters);
+      setTotalPages(Math.ceil(sortedChapters.length / pageSize));
+      updateDisplayedChapters(currentPage, sortedChapters);
       setLoadingProgress(100);
     } catch (error) {
       console.error("Error fetching chapters:", error);
@@ -148,40 +178,21 @@ export default function Chapters() {
       setLoading(false);
     }
   };
-  
-  // Add loading progress animation
-  useEffect(() => {
-    let progressInterval: NodeJS.Timeout;
-    
-    if (loading) {
-      setLoadingProgress(0);
-      progressInterval = setInterval(() => {
-        setLoadingProgress(prev => {
-          if (prev >= 90) {
-            clearInterval(progressInterval);
-            return 90;
-          }
-          return prev + 10;
-        });
-      }, 200);
-    }
 
-    return () => {
-      if (progressInterval) {
-        clearInterval(progressInterval);
-      }
-    };
-  }, [loading]);
+  // Function to update displayed chapters based on current page
+  const updateDisplayedChapters = (page: number, chapters: any[] = allChapters) => {
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const pageChapters = chapters.slice(startIndex, endIndex);
+    setChapters(pageChapters);
+    setCurrentPage(page);
+    localStorage.setItem('chaptersPage', page.toString());
+  };
 
-  // Fetch chapters when component mounts or page changes
+  // Update useEffect to fetch all chapters on mount
   useEffect(() => {
-    fetchChapters(currentPage);
-  }, [currentPage]);
-
-  // Update localStorage when page changes
-  useEffect(() => {
-    localStorage.setItem('chaptersPage', currentPage.toString());
-  }, [currentPage]);
+    fetchChapters();
+  }, []);
 
   const handleAddWord = () => {
     console.log('Adding word - Current state:', {
@@ -461,44 +472,28 @@ export default function Chapters() {
     XLSX.writeFile(wb, 'chapter_import_template.xlsx');
   };
 
-  // Function to handle file selection
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-    }
+  const calculateProgress = () => {
+    if (importProgress.totalSheets === 0 || importProgress.totalWords === 0) return 0;
+    
+    const sheetProgress = (importProgress.currentSheet / importProgress.totalSheets) * 50;
+    const wordProgress = (importProgress.currentWord / importProgress.totalWords) * 50;
+    return Math.round(sheetProgress + wordProgress);
   };
 
-  // Function to extract chapter number from sheet name
-  function extractChapterNumber(sheetName: string): number | null {
-    // First, try to extract any number from the sheet name
-    const anyNumber = sheetName.match(/\d+/);
-    if (anyNumber) {
-      const number = parseInt(anyNumber[0]);
-      if (!isNaN(number)) {
-        console.log(`Extracted chapter number ${number} from sheet name: ${sheetName}`);
-        return number;
-      }
-    }
-    console.warn(`Could not extract chapter number from sheet name: ${sheetName}`);
-    return null;
-  }
-
-  // Function to import vocabulary
   const handleImportVocabulary = async () => {
     if (!selectedFile) {
       alert("Please select a file");
       return;
     }
 
-    // Validate required fields
-    if (!importingChapter.level || !importingChapter.bookName) {
-      alert("Please select a level and enter a book name");
-      return;
-    }
-
-    setIsImporting(true);
-    setImportProgress(0);
+    setImporting(true);
+    setImportProgress({
+      currentSheet: 0,
+      totalSheets: 0,
+      currentWord: 0,
+      totalWords: 0,
+      status: 'Starting import...'
+    });
 
     try {
       // Read the Excel file
@@ -511,190 +506,274 @@ export default function Chapters() {
           console.log('Total sheets found:', workbook.SheetNames.length);
           console.log('Sheet names:', workbook.SheetNames);
           
+          setImportProgress(prev => ({
+            ...prev,
+            totalSheets: workbook.SheetNames.length,
+            status: 'Fetching existing chapters...'
+          }));
+          
+          // First, get all existing chapters for this book
+          const existingChaptersResponse = await fetch(
+            `${API_BASE_URL}/chapters/?book_name=${encodeURIComponent(importingChapter.bookName)}`,
+            {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include',
+            }
+          );
+          
+          if (!existingChaptersResponse.ok) {
+            throw new Error('Failed to fetch existing chapters');
+          }
+          
+          const existingChaptersData = await existingChaptersResponse.json();
+          const existingChapters = existingChaptersData.results || [];
+          console.log('Existing chapters:', existingChapters);
+          
           let totalImported = 0;
           let totalWords = 0;
           let createdChapters = 0;
           let skippedSheets = 0;
           
-          // Process each sheet as a separate chapter
           for (let sheetIndex = 0; sheetIndex < workbook.SheetNames.length; sheetIndex++) {
             const sheetName = workbook.SheetNames[sheetIndex];
-            console.log(`\nProcessing sheet ${sheetIndex + 1}/${workbook.SheetNames.length}: ${sheetName}`);
+            console.log(`Processing sheet ${sheetIndex + 1}/${workbook.SheetNames.length}: ${sheetName}`);
+            
+            // Extract chapter number from sheet name (e.g., "Chapter 26" -> 26)
+            const chapterNumberMatch = sheetName.match(/Chapter\s+(\d+)/i);
+            const chapterNumber = chapterNumberMatch ? parseInt(chapterNumberMatch[1]) : sheetIndex + 1;
+            console.log(`Extracted chapter number ${chapterNumber} from sheet name ${sheetName}`);
+            
             const worksheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
             console.log(`Found ${jsonData.length} vocabulary entries in sheet ${sheetName}`);
+            
+            setImportProgress(prev => ({
+              ...prev,
+              currentSheet: sheetIndex + 1,
+              totalWords: jsonData.length,
+              currentWord: 0,
+              status: `Processing sheet ${sheetName} (Chapter ${chapterNumber})`
+            }));
 
-            // Check if chapter already exists
+            // Find or create chapter
+            let createdChapter;
             const existingChapter = existingChapters.find(
-              (ch: any) => ch.chapter_number === sheetIndex + 1
+              (chapter: any) => chapter.chapter_number === chapterNumber
             );
 
-            let createdChapter = null;
             if (existingChapter) {
-              console.log(`Found existing chapter ${sheetIndex + 1} (${sheetName}) with ID: ${existingChapter.id}`);
+              console.log(`Found existing chapter ${chapterNumber} (${sheetName}) with ID: ${existingChapter.id}`);
               createdChapter = existingChapter;
             } else {
               setImportProgress(prev => ({
                 ...prev,
-                status: `Creating new chapter for sheet ${sheetName}`
+                status: `Creating new chapter ${chapterNumber} for sheet ${sheetName}`
               }));
 
-              console.log(`Creating new chapter for sheet ${sheetName}`);
+              console.log(`Creating new chapter ${chapterNumber} for sheet ${sheetName}`);
               const chapterData = {
                 level: importingChapter.level,
                 book_name: importingChapter.bookName,
-                chapter_number: sheetIndex + 1,
+                chapter_number: chapterNumber,
                 description: `${importingChapter.description || ""} - ${sheetName}`,
               };
               
               try {
+                console.log('Creating chapter with data:', chapterData);
                 const chapterResponse = await fetch(`${API_BASE_URL}/chapters/`, {
                   method: 'POST',
                   headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken() || '',
                   },
                   credentials: 'include',
                   body: JSON.stringify(chapterData),
                 });
                 
                 if (!chapterResponse.ok) {
-                  console.warn(`Failed to create chapter for sheet ${sheetName}: ${chapterResponse.status}`);
+                  console.warn(`Failed to create chapter ${chapterNumber} for sheet ${sheetName}: ${chapterResponse.status}`);
                   const errorData = await chapterResponse.json();
                   console.error('Chapter creation error:', errorData);
                   continue;
                 }
                 
                 createdChapter = await chapterResponse.json();
-                console.log(`Created new chapter for sheet ${sheetName} with ID: ${createdChapter.id}`);
+                console.log(`Successfully created chapter ${chapterNumber} for sheet ${sheetName} with ID: ${createdChapter.id}`);
+                createdChapters++;
+
+                // Verify the chapter was created by fetching it
+                const verifyResponse = await fetch(`${API_BASE_URL}/chapters/${createdChapter.id}/`, {
+                  method: 'GET',
+                  headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                  },
+                  credentials: 'include',
+                });
+
+                if (!verifyResponse.ok) {
+                  console.warn(`Warning: Could not verify created chapter ${createdChapter.id}: ${verifyResponse.status}`);
+                } else {
+                  const verifiedChapter = await verifyResponse.json();
+                  console.log('Verified chapter data:', verifiedChapter);
+                }
               } catch (error) {
-                console.warn(`Error creating chapter: ${error.message}`);
+                console.warn(`Error creating chapter ${chapterNumber}: ${error.message}`);
                 continue;
               }
             }
 
-            if (!createdChapter) {
-              console.warn(`Skipping sheet ${sheetName} - could not create or find chapter`);
-              continue;
-            }
+            // Process vocabulary entries
+            let validEntries = 0;
+            for (let i = 0; i < jsonData.length; i++) {
+              const row = jsonData[i];
+              setImportProgress(prev => ({
+                ...prev,
+                currentWord: i + 1,
+                status: `Processing word ${i + 1}/${jsonData.length} in ${sheetName}`
+              }));
 
-            // Create vocabulary words for this chapter
-            const vocabPromises = jsonData.map(async (row: any, index: number) => {
-              // Update progress for each word being processed
-              setImportProgress((sheetIndex / workbook.SheetNames.length) * 100 + 
-                ((index / jsonData.length) * (100 / workbook.SheetNames.length)));
+              // Get all possible column names for word and meaning
+              const wordColumn = Object.keys(row).find(key => 
+                key.toLowerCase().includes('word') || 
+                key.toLowerCase().includes('từ') ||
+                key.toLowerCase().includes('vocabulary')
+              );
+              
+              const meaningColumn = Object.keys(row).find(key => 
+                key.toLowerCase().includes('meaning') || 
+                key.toLowerCase().includes('nghĩa') ||
+                key.toLowerCase().includes('definition')
+              );
 
-              // Sanitize and validate the data
-              let word = row['Word (Japanese)']?.trim();
-              let meaning = row['Meaning (English)']?.trim();
-              let example = row['Example (Optional)']?.trim() || "";
+              const word = wordColumn ? row[wordColumn] : undefined;
+              const meaning = meaningColumn ? row[meaningColumn] : undefined;
+
+              console.log(`Processing row ${i + 1}:`, {
+                word,
+                meaning,
+                wordColumn,
+                meaningColumn,
+                row: row,
+                chapterId: createdChapter.id
+              });
 
               if (!word || !meaning) {
-                console.warn(`Skipping invalid vocabulary entry: ${JSON.stringify(row)}`);
-                return null;
+                console.warn(`Skipping row ${i + 1} in ${sheetName} - missing required fields. Word: "${word}", Meaning: "${meaning}"`);
+                continue;
               }
-
-              // Clean the word field
-              word = word.replace(/\[.*?\]/g, '').trim();
-              word = word.replace(/「.*?」/g, '').trim();
-              const japanesePart = word.split('(')[0].trim();
-              if (japanesePart) {
-                word = japanesePart;
-              }
-              const beforeHyphen = word.split('-')[0].trim();
-              if (beforeHyphen) {
-                word = beforeHyphen;
-              }
-              word = word.replace(/\s+/g, ' ').trim();
-
-              // Clean the example field
-              example = example.replace(/<br>/g, '\n');
-              example = example.replace(/<[^>]*>/g, '');
-              example = example.replace(/\s+/g, ' ').trim();
-
-              if (!word || word.length === 0) {
-                console.warn(`Skipping entry with empty word after cleaning: ${JSON.stringify(row)}`);
-                return null;
-              }
-
-              const vocabData = {
-                word: word,
-                meaning: meaning,
-                example: example,
-                chapter: createdChapter.id
-              };
 
               try {
-                console.log('Creating vocabulary with data:', vocabData);
-                const vocabResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
+                const vocabularyData = {
+                  chapter: createdChapter.id,
+                  word: word.trim(),
+                  meaning: meaning.trim(),
+                  example: (row['Example'] || row['example'] || row['Ví dụ'] || row['ví dụ'] || '').trim(),
+                  example_translation: (row['Translation'] || row['translation'] || row['Dịch'] || row['dịch'] || '').trim(),
+                };
+
+                console.log(`Creating vocabulary for word "${word}" in chapter ${chapterNumber} (ID: ${createdChapter.id}):`, vocabularyData);
+
+                const vocabularyResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
                   method: 'POST',
                   headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
-                    'X-CSRFToken': getCSRFToken() || '',
                   },
                   credentials: 'include',
-                  body: JSON.stringify(vocabData),
+                  body: JSON.stringify(vocabularyData),
                 });
 
-                if (!vocabResponse.ok) {
-                  const errorData = await vocabResponse.json();
-                  console.error('Vocabulary creation error:', errorData);
-                  throw new Error(`Failed to create vocabulary word: ${word}`);
+                if (!vocabularyResponse.ok) {
+                  const errorData = await vocabularyResponse.json();
+                  console.warn(`Failed to create vocabulary for word "${word}" in ${sheetName}:`, {
+                    status: vocabularyResponse.status,
+                    error: errorData,
+                    chapterId: createdChapter.id
+                  });
+                  continue;
                 }
 
-                return vocabResponse.json();
-              } catch (error) {
-                console.error(`Error creating vocabulary for word "${word}":`, error);
-                return null;
-              }
-            });
+                const createdVocabulary = await vocabularyResponse.json();
+                console.log(`Successfully created vocabulary for word "${word}" in chapter ${chapterNumber} (ID: ${createdChapter.id}):`, createdVocabulary);
 
-            // Filter out null results from failed imports
-            const results = await Promise.all(vocabPromises);
-            const successfulImports = results.filter(result => result !== null);
-            totalImported += successfulImports.length;
-            console.log(`Successfully imported ${successfulImports.length}/${jsonData.length} words for chapter ${chapterNumber} (${sheetName})`);
+                validEntries++;
+                totalImported++;
+              } catch (error) {
+                console.warn(`Error creating vocabulary for word "${word}" in ${sheetName}: ${error.message}`);
+              }
+            }
+
+            if (validEntries === 0) {
+              console.warn(`No valid vocabulary entries found in ${sheetName}. Total rows: ${jsonData.length}`);
+              skippedSheets++;
+            } else {
+              console.log(`Successfully imported ${validEntries} vocabulary entries in chapter ${chapterNumber}`);
+              totalWords += validEntries;
+            }
           }
 
-          // Set progress to 100% when complete
-          setImportProgress(100);
-          
-          // Refresh chapters list after import
-          console.log('Refreshing chapters list...');
+          // Show success message
+          setImportProgress(prev => ({
+            ...prev,
+            status: `Import completed successfully! Imported ${totalImported} words across ${createdChapters} chapters. ${skippedSheets} sheets were skipped.`
+          }));
+
+          // Refresh the chapters list
           await fetchChapters();
-          
-          // Close dialog and reset states
-          setImportDialogOpen(false);
-          setSelectedFile(null);
-          setImportingChapter({
-            level: "N5",
-            bookName: "",
-            chapterNumber: "",
-            description: ""
-          });
-          
-          alert(`Successfully imported ${totalImported}/${totalWords} words across ${createdChapters} chapters! (${skippedSheets} sheets skipped)`);
+
+          // Close the import dialog after a delay
+          setTimeout(() => {
+            setImportDialogOpen(false);
+            setImporting(false);
+            setImportProgress({
+              currentSheet: 0,
+              totalSheets: 0,
+              currentWord: 0,
+              totalWords: 0,
+              status: ''
+            });
+          }, 3000);
+
         } catch (error) {
           console.error("Error importing vocabulary:", error);
-          alert(`Error: ${error.message}`);
-        } finally {
-          setIsImporting(false);
+          setImportProgress(prev => ({
+            ...prev,
+            status: `Error: ${error.message}`
+          }));
+          setImporting(false);
         }
       };
 
       reader.readAsArrayBuffer(selectedFile);
     } catch (error) {
-      console.error("Error in import process:", error);
-      alert(`Error: ${error.message}`);
-      setIsImporting(false);
+      console.error("Error reading file:", error);
+      setImportProgress(prev => ({
+        ...prev,
+        status: `Error: ${error.message}`
+      }));
+      setImporting(false);
     }
   };
 
   // Function to handle navigation to chapter detail
   const handleViewChapter = (chapterId: number) => {
     navigate(`/chapters/${chapterId}`);
+  };
+
+  // Update pagination handlers
+  const handlePreviousPage = () => {
+    const newPage = Math.max(1, currentPage - 1);
+    updateDisplayedChapters(newPage);
+  };
+
+  const handleNextPage = () => {
+    const newPage = Math.min(totalPages, currentPage + 1);
+    updateDisplayedChapters(newPage);
   };
 
   return (
@@ -781,13 +860,13 @@ export default function Chapters() {
                       />
                     </div>
 
-                    {isImporting && (
+                    {importing && (
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Importing vocabulary...</span>
-                          <span className="text-sm text-muted-foreground">{Math.round(importProgress)}%</span>
+                          <span className="text-sm text-muted-foreground">{importProgress.status}</span>
+                          <span className="text-sm text-muted-foreground">{calculateProgress()}%</span>
                         </div>
-                        <Progress value={importProgress} className="h-2" />
+                        <Progress value={calculateProgress()} className="h-2" />
                       </div>
                     )}
 
@@ -796,9 +875,8 @@ export default function Chapters() {
                       <Input
                         id="importFile"
                         type="file"
-                        accept=".xlsx,.xls,.csv"
-                        onChange={handleFileSelect}
-                        disabled={isImporting}
+                        accept=".xlsx,.xls"
+                        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                       />
                     </div>
                   </div>
@@ -806,16 +884,25 @@ export default function Chapters() {
                   <DialogFooter>
                     <Button 
                       variant="outline" 
-                      onClick={() => setImportDialogOpen(false)}
-                      disabled={isImporting}
+                      onClick={() => {
+                        setImportDialogOpen(false);
+                        setImporting(false);
+                        setImportProgress({
+                          currentSheet: 0,
+                          totalSheets: 0,
+                          currentWord: 0,
+                          totalWords: 0,
+                          status: ''
+                        });
+                      }}
                     >
                       Cancel
                     </Button>
                     <Button 
                       onClick={handleImportVocabulary}
-                      disabled={isImporting || !selectedFile}
+                      disabled={!selectedFile || !importingChapter.bookName || !importingChapter.level || importing}
                     >
-                      {isImporting ? 'Importing...' : 'Import'}
+                      {importing ? 'Importing...' : 'Import'}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -1117,7 +1204,7 @@ export default function Chapters() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  onClick={handlePreviousPage}
                   disabled={currentPage === 1}
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -1126,7 +1213,7 @@ export default function Chapters() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  onClick={handleNextPage}
                   disabled={currentPage === totalPages}
                 >
                   Next
