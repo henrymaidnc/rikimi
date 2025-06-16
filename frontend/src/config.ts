@@ -30,22 +30,4 @@ export const getDefaultHeaders = () => {
     'X-CSRFToken': getCSRFToken() || '',
   };
 };
-
-export const fetchCSRFToken = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/csrf/`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch CSRF token');
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error fetching CSRF token:', error);
-    throw error;
-  }
-};
   

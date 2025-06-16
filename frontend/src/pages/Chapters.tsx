@@ -244,12 +244,9 @@ export default function Chapters() {
     }
 
     try {
-      // Fetch CSRF token first
-      await fetchCSRFToken();
       const csrfToken = getCSRFToken();
-      
       if (!csrfToken) {
-        throw new Error('Failed to get CSRF token');
+        throw new Error('CSRF token not found in cookies');
       }
 
       const chapterData = {
