@@ -3,6 +3,24 @@ from .base import *
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
+# Override REST Framework settings for production
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',  # Allow all operations in production
+    ],
+}
+
 # Security settings
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
@@ -22,6 +40,9 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_HTTPONLY = False
 CSRF_USE_SESSIONS = False
 CSRF_COOKIE_DOMAIN = '.rikimi.edu.vn'
+CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'  # Use default CSRF failure view
+CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'  # Allow X-CSRFToken header
+CSRF_COOKIE_NAME = 'csrftoken'  # Standard CSRF cookie name
 
 # Session Settings
 SESSION_COOKIE_SECURE = True

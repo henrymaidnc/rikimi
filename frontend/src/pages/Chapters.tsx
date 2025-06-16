@@ -13,7 +13,7 @@ import { Chapter } from "@/types";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import * as XLSX from 'xlsx';
-import { API_BASE_URL, getDefaultHeaders } from '@/config';
+import { API_BASE_URL } from '@/config';
 
 
 interface WordData {
@@ -51,7 +51,7 @@ async function fetchCSRFToken() {
   try {
     const response = await fetch(`${API_BASE_URL}/csrf/`, {
       method: 'GET',
-      credentials: 'include',
+      credentials: 'omit',  // Don't send credentials
     });
     if (!response.ok) {
       throw new Error('Failed to fetch CSRF token');
@@ -59,7 +59,7 @@ async function fetchCSRFToken() {
     return getCSRFToken();
   } catch (error) {
     console.error('Error fetching CSRF token:', error);
-    throw error;
+    return null;
   }
 }
 
@@ -124,9 +124,8 @@ export default function Chapters() {
           headers: {
             'Accept': 'application/json',
             'Content-Type': 'application/json',
-            'X-CSRFToken': getCSRFToken() || '',
           },
-          credentials: 'include',
+          credentials: 'omit',
         });
 
         if (!response.ok) {
@@ -264,9 +263,8 @@ export default function Chapters() {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'X-CSRFToken': csrfToken,
         },
-        credentials: 'include',
+        credentials: 'omit',
         body: JSON.stringify(chapterData),
       });
 
@@ -292,14 +290,13 @@ export default function Chapters() {
           
           console.log('Creating vocabulary with data:', vocabData);
           
-          const vocabResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
+          const vocabResponse = await fetch(`${API_BASE_URL}/chapters/${createdChapter.id}/vocabulary/`, {
             method: 'POST',
             headers: {
               'Accept': 'application/json',
               'Content-Type': 'application/json',
-              'X-CSRFToken': csrfToken,
             },
-            credentials: 'include',
+            credentials: 'omit',
             body: JSON.stringify(vocabData),
           });
 
@@ -333,7 +330,7 @@ export default function Chapters() {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
+        credentials: 'omit',
       });
 
       if (!updatedChapterResponse.ok) {
@@ -376,9 +373,8 @@ export default function Chapters() {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
-          'X-CSRFToken': getCSRFToken() || '',
         },
-        credentials: 'include',
+        credentials: 'omit',
       });
 
       if (!response.ok) {
@@ -404,13 +400,13 @@ export default function Chapters() {
 
     setIsSearching(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/vocabularies/?search=${encodeURIComponent(searchQuery)}`, {
+      const response = await fetch(`${API_BASE_URL}/chapters/?search=${encodeURIComponent(searchQuery)}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
+        credentials: 'omit',
       });
 
       if (!response.ok) {
@@ -514,8 +510,11 @@ export default function Chapters() {
             `${API_BASE_URL}/chapters/?book_name=${encodeURIComponent(importingChapter.bookName)}`,
             {
               method: 'GET',
-              headers: getDefaultHeaders(),
-              credentials: 'include',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              credentials: 'omit',  // Don't send credentials
             }
           );
           
@@ -578,8 +577,11 @@ export default function Chapters() {
               try {
                 const chapterResponse = await fetch(`${API_BASE_URL}/chapters/`, {
                   method: 'POST',
-                  headers: getDefaultHeaders(),
-                  credentials: 'include',
+                  headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                  },
+                  credentials: 'omit',  // Don't send credentials
                   body: JSON.stringify(chapterData),
                 });
                 
@@ -647,10 +649,13 @@ export default function Chapters() {
                     chapter: createdChapter.id
                   };
 
-                  const vocabularyResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
+                  const vocabularyResponse = await fetch(`${API_BASE_URL}/chapters/${createdChapter.id}/vocabulary/`, {
                     method: 'POST',
-                    headers: getDefaultHeaders(),
-                    credentials: 'include',
+                    headers: {
+                      'Accept': 'application/json',
+                      'Content-Type': 'application/json',
+                    },
+                    credentials: 'omit',  // Don't send credentials
                     body: JSON.stringify(vocabularyData),
                   });
 
