@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { RotateCcw, CheckCircle, XCircle, Eye } from "lucide-react";
+import { RotateCcw, CheckCircle, XCircle, Eye, Shuffle } from "lucide-react";
 import { API_BASE_URL } from '@/config';
 import { ChapterSelector } from "./ChapterSelector";
 
@@ -115,11 +115,22 @@ export function FlashcardGame({ onExit, questionType }: FlashcardGameProps) {
   };
 
   const resetGame = () => {
+    // Shuffle the cards before resetting
+    const shuffledCards = shuffleArray([...cardList]);
+    setCardList(shuffledCards);
     setCurrentIndex(0);
     setShowAnswer(false);
     setCorrectCount(0);
     setIncorrectCount(0);
     setStudiedCards(new Set());
+  };
+
+  const shuffleCurrentCards = () => {
+    // Shuffle only the remaining cards
+    const remainingCards = cardList.slice(currentIndex);
+    const shuffledRemaining = shuffleArray([...remainingCards]);
+    const newCardList = [...cardList.slice(0, currentIndex), ...shuffledRemaining];
+    setCardList(newCardList);
   };
 
   const nextCard = () => {
@@ -227,10 +238,16 @@ export function FlashcardGame({ onExit, questionType }: FlashcardGameProps) {
               {currentIndex + 1} / {cardList.length}
             </Badge>
           </div>
-          <Button variant="outline" size="sm" onClick={resetGame} className="w-full sm:w-auto">
-            <RotateCcw className="h-4 w-4 mr-1" />
-            Reset
-          </Button>
+          <div className="flex space-x-2 w-full sm:w-auto">
+            <Button variant="outline" size="sm" onClick={shuffleCurrentCards} className="w-full sm:w-auto">
+              <Shuffle className="h-4 w-4 mr-1" />
+              Shuffle
+            </Button>
+            <Button variant="outline" size="sm" onClick={resetGame} className="w-full sm:w-auto">
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Reset
+            </Button>
+          </div>
         </div>
         <Progress value={progress} className="h-2" />
       </div>
