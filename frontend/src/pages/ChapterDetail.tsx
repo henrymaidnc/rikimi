@@ -371,11 +371,20 @@ export default function ChapterDetail() {
 
   const handleAddWord = async () => {
     if (!newWord.word || !newWord.meaning) {
-      alert("Please fill in at least the word and its meaning");
+      alert("Please fill in both word and meaning");
       return;
     }
 
     try {
+      const vocabularyData = {
+        word: newWord.word.trim(),
+        meaning: newWord.meaning.trim(),
+        example: newWord.example?.trim() || "",
+        chapter: chapter.id
+      };
+
+      console.log('Creating vocabulary with data:', vocabularyData);
+
       const response = await fetch(`${API_BASE_URL}/vocabularies/`, {
         method: 'POST',
         headers: {
@@ -383,29 +392,36 @@ export default function ChapterDetail() {
           'Content-Type': 'application/json',
         },
         credentials: 'omit',
-        body: JSON.stringify(newWord),
+        body: JSON.stringify(vocabularyData)
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to add word: ${response.status}`);
+        const errorData = await response.json();
+        console.error('Vocabulary creation error:', errorData);
+        throw new Error(`Failed to add word: ${errorData.detail || response.status}`);
       }
 
-      const addedWord = await response.json();
-      
-      // Update the chapter's vocabulary list
-      if (chapter) {
-        setChapter({
-          ...chapter,
-          words: [...(chapter.words || []), addedWord]
-        });
-      }
+      const createdWord = await response.json();
+      console.log('Vocabulary created successfully:', createdWord);
 
-      // Reset form and close dialog
-      setNewWord({ word: "", meaning: "", example: "" });
-      setAddWordDialogOpen(false);
+      // Add the new word to the local state
+      setChapter(prevChapter => {
+        if (!prevChapter) return null;
+        return {
+          ...prevChapter,
+          words: [...(prevChapter.words || []), createdWord]
+        };
+      });
+
+      // Reset the form
+      setNewWord({
+        word: "",
+        meaning: "",
+        example: ""
+      });
     } catch (error) {
-      console.error("Error adding word:", error);
-      alert(`Error: ${error.message}`);
+      console.error('Error adding word:', error);
+      alert(`Error adding word: ${error.message}`);
     }
   };
 

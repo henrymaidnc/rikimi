@@ -362,11 +362,38 @@ export default function Chapters() {
     }
   };
 
-  const handleDeleteChapter = async () => {
-    if (!chapterToDelete) return;
+  const handleDeleteChapter = async (chapterId: number) => {
+    if (!chapterId) {
+      console.error('No chapter ID provided for deletion');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to delete this chapter?')) {
+      return;
+    }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/chapters/${chapterToDelete.id}/`, {
+      // First check if the chapter exists
+      const checkResponse = await fetch(`${API_BASE_URL}/chapters/${chapterId}/`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'omit',
+      });
+
+      if (!checkResponse.ok) {
+        if (checkResponse.status === 404) {
+          // Chapter doesn't exist, just remove it from local state
+          setChapters(prevChapters => prevChapters.filter(c => c.id !== chapterId));
+          return;
+        }
+        throw new Error(`Failed to check chapter: ${checkResponse.status}`);
+      }
+
+      // If chapter exists, proceed with deletion
+      const deleteResponse = await fetch(`${API_BASE_URL}/chapters/${chapterId}/`, {
         method: 'DELETE',
         headers: {
           'Accept': 'application/json',
@@ -375,17 +402,15 @@ export default function Chapters() {
         credentials: 'omit',
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to delete chapter: ${response.status}`);
+      if (!deleteResponse.ok) {
+        throw new Error(`Failed to delete chapter: ${deleteResponse.status}`);
       }
 
-      // Remove the deleted chapter from the list
-      setChapters(chapters.filter(chapter => chapter.id !== chapterToDelete.id));
-      setDeleteDialogOpen(false);
-      setChapterToDelete(null);
+      // Remove the chapter from the local state
+      setChapters(prevChapters => prevChapters.filter(c => c.id !== chapterId));
     } catch (error) {
-      console.error("Error deleting chapter:", error);
-      alert(`Error: ${error.message}`);
+      console.error('Error deleting chapter:', error);
+      alert(`Error deleting chapter: ${error.message}`);
     }
   };
 
@@ -647,8 +672,8 @@ export default function Chapters() {
                     chapter: createdChapter.id
                   };
 
-                  const vocabularyResponse = await fetch(`${API_BASE_URL}/chapters/${createdChapter.id}/vocabulary/${vocabularyData.word}/`, {
-                    method: 'PATCH',
+                  const vocabularyResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
+                    method: 'POST',
                     headers: {
                       'Accept': 'application/json',
                       'Content-Type': 'application/json',
@@ -1059,7 +1084,7 @@ export default function Chapters() {
           <>
             <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
               {chapters.map((chapter) => (
-                <Card key={chapter.id} className="overflow-hidden">
+                <Card key={`${chapter.bookName}-${chapter.chapterNumber}-${chapter.id}`} className="overflow-hidden">
                   <CardHeader className="bg-secondary/30">
                     <CardTitle className="text-base">
                       {chapter.bookName ? (
@@ -1179,7 +1204,7 @@ export default function Chapters() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDeleteChapter}
+              onClick={() => handleDeleteChapter(chapterToDelete?.id || 0)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
