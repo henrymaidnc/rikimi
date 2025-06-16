@@ -61,22 +61,54 @@ export function InputTest({ chapterId, questionType, onExit, bookName, chapterNu
     setLoading(true);
     setError(null);
     try {
-      console.log("Fetching questions from API...");
-      let url = `${API_BASE_URL}/input-test-questions/?book_name=${encodeURIComponent(bookName)}&chapter_number=${chapterNumber}&question_type=${questionType}`;
-      console.log("API URL:", url);
-      console.log("Request params:", { questionType, bookName, chapterNumber });
-      const response = await fetch(url, { credentials: "include" });
-      console.log("Response status:", response.status);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch questions: ${response.status}`);
+      const url = `${API_BASE_URL}/input-test-questions/?book_name=${encodeURIComponent(bookName)}&chapter_number=${chapterNumber}&question_type=${questionType}`;
+      console.log('Fetching questions from:', url);
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch questions: ${res.status} ${res.statusText}`);
       }
-      const data = await response.json();
-      console.log("API response:", data);
-      // Handle paginated response
-      setQuestions(data.results || []);
-    } catch (err) {
-      console.error("Error fetching questions:", err);
-      setQuestions([]);
+      const data = await res.json();
+      console.log('Fetched questions:', data);
+      
+      if (!data.results || data.results.length === 0) {
+        // If no questions found, create some template questions
+        const templateQuestions = [
+          {
+            id: -1,
+            question_text: "食べる",
+            correct_answer: "たべる",
+            hint: "to eat"
+          },
+          {
+            id: -2,
+            question_text: "飲む",
+            correct_answer: "のむ",
+            hint: "to drink"
+          }
+        ];
+        setQuestions(templateQuestions);
+      } else {
+        setQuestions(data.results);
+      }
+    } catch (err: any) {
+      console.error('Error fetching questions:', err);
+      setError(err.message);
+      // Set template questions as fallback
+      const templateQuestions = [
+        {
+          id: -1,
+          question_text: "食べる",
+          correct_answer: "たべる",
+          hint: "to eat"
+        },
+        {
+          id: -2,
+          question_text: "飲む",
+          correct_answer: "のむ",
+          hint: "to drink"
+        }
+      ];
+      setQuestions(templateQuestions);
     } finally {
       setLoading(false);
     }
@@ -112,7 +144,6 @@ export function InputTest({ chapterId, questionType, onExit, bookName, chapterNu
             headers: {
               "Content-Type": "application/json",
             },
-            credentials: "include",
             body: JSON.stringify({ answer: userAnswer }),
           }
         );
