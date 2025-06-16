@@ -67,7 +67,7 @@ export default function Chapters() {
   const navigate = useNavigate();
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingStatus, setLoadingStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(() => {
     // Get the stored page from localStorage
@@ -111,6 +111,7 @@ export default function Chapters() {
   // Define fetchChapters function
   const fetchChapters = async () => {
     setLoading(true);
+    setLoadingStatus('Loading chapters...');
     try {
       console.log('Fetching all chapters...');
       let allChaptersData: any[] = [];
@@ -156,6 +157,7 @@ export default function Chapters() {
       }
 
       // Sort all chapters by book name and chapter number
+      setLoadingStatus('Sorting chapters...');
       const sortedChapters = allChaptersData.sort((a, b) => {
         if (a.bookName !== b.bookName) {
           return a.bookName.localeCompare(b.bookName);
@@ -169,10 +171,10 @@ export default function Chapters() {
       setAllChapters(sortedChapters);
       setTotalPages(Math.ceil(sortedChapters.length / pageSize));
       updateDisplayedChapters(currentPage, sortedChapters);
-      setLoadingProgress(100);
     } catch (error) {
       console.error("Error fetching chapters:", error);
       setError(error.message);
+      setLoadingStatus('Error loading chapters');
     } finally {
       setLoading(false);
     }
@@ -243,11 +245,6 @@ export default function Chapters() {
     }
 
     try {
-      const csrfToken = getCSRFToken();
-      if (!csrfToken) {
-        throw new Error('CSRF token not found in cookies');
-      }
-
       const chapterData = {
         level: newChapter.level,
         book_name: newChapter.bookName,
@@ -270,6 +267,7 @@ export default function Chapters() {
 
       if (!chapterResponse.ok) {
         const errorData = await chapterResponse.json();
+        console.error('Chapter creation error:', errorData);
         throw new Error(errorData.detail || 'Failed to create chapter');
       }
 
@@ -290,7 +288,7 @@ export default function Chapters() {
           
           console.log('Creating vocabulary with data:', vocabData);
           
-          const vocabResponse = await fetch(`${API_BASE_URL}/chapters/${createdChapter.id}/vocabulary/`, {
+          const vocabResponse = await fetch(`${API_BASE_URL}/vocabularies/`, {
             method: 'POST',
             headers: {
               'Accept': 'application/json',
@@ -360,7 +358,7 @@ export default function Chapters() {
       setDialogOpen(false);
     } catch (error) {
       console.error('Error creating chapter:', error);
-      throw error;
+      alert(`Error creating chapter: ${error.message}`);
     }
   };
 
@@ -1048,15 +1046,14 @@ export default function Chapters() {
           </div>
         </div>
         
-        {loading ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Loading chapters...</span>
-              <span className="text-sm text-muted-foreground">{Math.round(loadingProgress)}%</span>
-            </div>
-            <Progress value={loadingProgress} className="h-2" />
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <p className="mt-4 text-sm text-muted-foreground">{loadingStatus}</p>
           </div>
-        ) : error ? (
+        )}
+
+        {error ? (
           <div className="text-red-500">Error: {error}</div>
         ) : (
           <>
