@@ -36,35 +36,52 @@ export function FlashcardGame({ onExit, questionType }: FlashcardGameProps) {
   const [incorrectCount, setIncorrectCount] = useState(0);
   const [studiedCards, setStudiedCards] = useState<Set<number>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchCards = async (chapters: Chapter[]) => {
     setLoading(true);
     let allCards: any[] = [];
 
-    for (const chapter of chapters) {
-      if (questionType === "vocabulary" || questionType === "kanji") {
-        const vocabRes = await fetch(
-          `${API_BASE_URL}/vocabularies/?chapter=${chapter.id}`
-        );
-        const vocabData = await vocabRes.json();
-        allCards = [...allCards, ...(vocabData.results || [])];
-      } else if (questionType === "grammar") {
-        const grammarRes = await fetch(
-          `${API_BASE_URL}/grammar_patterns/?chapter=${chapter.id}`
-        );
-        const grammarData = await grammarRes.json();
-        allCards = [...allCards, ...(grammarData.results || [])];
+    try {
+      for (const chapter of chapters) {
+        if (questionType === "vocabulary" || questionType === "kanji") {
+          const vocabRes = await fetch(
+            `${API_BASE_URL}/vocabularies/?chapter=${chapter.id}`
+          );
+          if (!vocabRes.ok) {
+            console.error(`Failed to fetch vocabulary for chapter ${chapter.id}:`, vocabRes.statusText);
+            continue;
+          }
+          const vocabData = await vocabRes.json();
+          const chapterCards = vocabData.results || [];
+          console.log(`Fetched ${chapterCards.length} cards from chapter ${chapter.id}`);
+          allCards = [...allCards, ...chapterCards];
+        } else if (questionType === "grammar") {
+          const grammarRes = await fetch(
+            `${API_BASE_URL}/grammar_patterns/?chapter=${chapter.id}`
+          );
+          if (!grammarRes.ok) {
+            console.error(`Failed to fetch grammar for chapter ${chapter.id}:`, grammarRes.statusText);
+            continue;
+          }
+          const grammarData = await grammarRes.json();
+          const chapterCards = grammarData.results || [];
+          console.log(`Fetched ${chapterCards.length} cards from chapter ${chapter.id}`);
+          allCards = [...allCards, ...chapterCards];
+        }
       }
-    }
 
-    // Shuffle and limit to 20 cards
-    allCards = shuffleArray(allCards);
-    if (allCards.length > 20) {
-      allCards = allCards.slice(0, 20);
-    }
+      // Shuffle all cards
+      allCards = shuffleArray(allCards);
+      console.log(`Total cards after shuffling: ${allCards.length}`);
 
-    setCardList(allCards);
-    setLoading(false);
+      setCardList(allCards);
+    } catch (error) {
+      console.error('Error fetching cards:', error);
+      setError('Failed to load cards. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChapterSelect = (chapters: Chapter[]) => {
@@ -83,6 +100,15 @@ export function FlashcardGame({ onExit, questionType }: FlashcardGameProps) {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading flashcards...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-600 mb-4">{error}</p>
+        <Button onClick={() => setSelectedChapters([])}>Select Different Chapters</Button>
       </div>
     );
   }
