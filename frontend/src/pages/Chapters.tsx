@@ -649,8 +649,8 @@ export default function Chapters() {
                     chapter: createdChapter.id
                   };
 
-                  const vocabularyResponse = await fetch(`${API_BASE_URL}/chapters/${createdChapter.id}/vocabulary/`, {
-                    method: 'POST',
+                  const vocabularyResponse = await fetch(`${API_BASE_URL}/chapters/${createdChapter.id}/vocabulary/${vocabularyData.word}/`, {
+                    method: 'PATCH',
                     headers: {
                       'Accept': 'application/json',
                       'Content-Type': 'application/json',

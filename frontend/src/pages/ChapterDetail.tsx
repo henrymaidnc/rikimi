@@ -174,12 +174,8 @@ export default function ChapterDetail() {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
-        body: JSON.stringify({
-          word: editedWord.word,
-          meaning: editedWord.meaning,
-          example: editedWord.example || "",
-        }),
+        credentials: 'omit',
+        body: JSON.stringify(editedWord),
       });
 
       if (!response.ok) {
@@ -187,8 +183,8 @@ export default function ChapterDetail() {
       }
 
       const updatedWord = await response.json();
-      
-      // Update the word in the chapter's words array
+      console.log('Updated word:', updatedWord);
+
       setChapter(prevChapter => {
         if (!prevChapter) return null;
         return {
@@ -386,13 +382,8 @@ export default function ChapterDetail() {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
-        body: JSON.stringify({
-          word: newWord.word.trim(),
-          meaning: newWord.meaning.trim(),
-          example: newWord.example.trim(),
-          chapter: chapter?.id
-        }),
+        credentials: 'omit',
+        body: JSON.stringify(newWord),
       });
 
       if (!response.ok) {

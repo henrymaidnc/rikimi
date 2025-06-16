@@ -26,7 +26,13 @@ function useNotesAPI() {
   const fetchNotes = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/notes/`, { credentials: 'include' });
+      const response = await fetch(`${API_BASE_URL}/notes/`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'omit',  // Don't send credentials
+      });
       if (!response.ok) throw new Error('Failed to fetch notes');
       const data = await response.json();
       setNotes(data.results || data);
@@ -42,8 +48,11 @@ function useNotesAPI() {
     try {
       const response = await fetch(`${API_BASE_URL}/notes/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'omit',  // Don't send credentials
         body: JSON.stringify(noteData),
       });
       if (!response.ok) throw new Error('Failed to create note');
@@ -60,8 +69,11 @@ function useNotesAPI() {
     try {
       const response = await fetch(`${API_BASE_URL}/notes/${id}/`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'omit',  // Don't send credentials
         body: JSON.stringify(noteData),
       });
       if (!response.ok) throw new Error('Failed to update note');
@@ -78,7 +90,11 @@ function useNotesAPI() {
     try {
       const response = await fetch(`${API_BASE_URL}/notes/${id}/`, {
         method: 'DELETE',
-        credentials: 'include',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        credentials: 'omit',  // Don't send credentials
       });
       if (!response.ok) throw new Error('Failed to delete note');
       setNotes(prev => prev.filter(n => n.id !== id));
