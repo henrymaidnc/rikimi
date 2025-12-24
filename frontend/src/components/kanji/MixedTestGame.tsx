@@ -11,12 +11,12 @@ import { API_BASE_URL } from '@/config';
 
 interface MixedTestGameProps {
   onExit: () => void;
-  bookName: string;
-  chapterNumber: string;
   questionType: string;
+  bookName?: string;
+  chapterNumber?: string;
 }
 
-export function MixedTestGame({ onExit, bookName, chapterNumber, questionType }: MixedTestGameProps) {
+export function MixedTestGame({ onExit, questionType, bookName, chapterNumber }: MixedTestGameProps) {
   const [questions, setQuestions] = useState<any[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<any[]>([]);
@@ -26,20 +26,123 @@ export function MixedTestGame({ onExit, bookName, chapterNumber, questionType }:
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('MixedTestGame mounted with props:', { questionType, bookName, chapterNumber });
     const fetchQuestions = async () => {
       setLoading(true);
       setError(null);
       try {
-        const url = `${API_BASE_URL}/input-test-questions/?book_name=${encodeURIComponent(bookName)}&chapter_number=${chapterNumber}&question_type=${questionType}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Failed to fetch questions");
-        const data = await res.json();
-        const shuffledQuestions = (data.results || []).sort(() => Math.random() - 0.5);
-        setQuestions(shuffledQuestions);
-        setAnswers(new Array(shuffledQuestions.length).fill(null));
+        let inputTestQuestions = [];
+        let jlptTestQuestions = [];
+
+        // Only fetch from API if bookName and chapterNumber are provided
+        if (bookName && chapterNumber) {
+          // First try to get questions from the input test endpoint
+          const inputTestUrl = `${API_BASE_URL}/input-test-questions/?book_name=${encodeURIComponent(bookName)}&chapter_number=${chapterNumber}&question_type=${questionType}`;
+          console.log('Fetching input test questions from:', inputTestUrl);
+          const inputTestRes = await fetch(inputTestUrl);
+          
+          if (inputTestRes.ok) {
+            const inputTestData = await inputTestRes.json();
+            inputTestQuestions = inputTestData.results || [];
+            console.log('Fetched input test questions:', inputTestQuestions);
+          } else {
+            console.error('Failed to fetch input test questions:', inputTestRes.statusText);
+          }
+
+          // Then try to get questions from the JLPT test endpoint
+          const jlptTestUrl = `${API_BASE_URL}/jlpt-test-questions/?book_name=${encodeURIComponent(bookName)}&chapter_number=${chapterNumber}&question_type=${questionType}`;
+          console.log('Fetching JLPT test questions from:', jlptTestUrl);
+          const jlptTestRes = await fetch(jlptTestUrl);
+          
+          if (jlptTestRes.ok) {
+            const jlptTestData = await jlptTestRes.json();
+            jlptTestQuestions = jlptTestData.results || [];
+            console.log('Fetched JLPT test questions:', jlptTestQuestions);
+          } else {
+            console.error('Failed to fetch JLPT test questions:', jlptTestRes.statusText);
+          }
+        }
+
+        // Combine and shuffle all questions
+        const allQuestions = [...inputTestQuestions, ...jlptTestQuestions];
+        console.log('Total questions before template:', allQuestions.length);
+        
+        if (allQuestions.length === 0) {
+          // If no questions found, create some template questions
+          const templateQuestions = [
+            {
+              id: -1,
+              question_text: "食べる",
+              correct_answer: "たべる",
+              hint: "to eat",
+              options: ["たべる", "のむ", "いく", "くる"]
+            },
+            {
+              id: -2,
+              question_text: "飲む",
+              correct_answer: "のむ",
+              hint: "to drink",
+              options: ["たべる", "のむ", "いく", "くる"]
+            },
+            {
+              id: -3,
+              question_text: "行く",
+              correct_answer: "いく",
+              hint: "to go",
+              options: ["たべる", "のむ", "いく", "くる"]
+            },
+            {
+              id: -4,
+              question_text: "来る",
+              correct_answer: "くる",
+              hint: "to come",
+              options: ["たべる", "のむ", "いく", "くる"]
+            }
+          ];
+          console.log('Using template questions:', templateQuestions);
+          setQuestions(templateQuestions);
+        } else {
+          // Shuffle the questions
+          const shuffledQuestions = allQuestions.sort(() => Math.random() - 0.5);
+          console.log('Using shuffled questions:', shuffledQuestions);
+          setQuestions(shuffledQuestions);
+        }
       } catch (err: any) {
+        console.error('Error fetching questions:', err);
         setError(err.message);
-        setQuestions([]);
+        // Set template questions as fallback
+        const templateQuestions = [
+          {
+            id: -1,
+            question_text: "食べる",
+            correct_answer: "たべる",
+            hint: "to eat",
+            options: ["たべる", "のむ", "いく", "くる"]
+          },
+          {
+            id: -2,
+            question_text: "飲む",
+            correct_answer: "のむ",
+            hint: "to drink",
+            options: ["たべる", "のむ", "いく", "くる"]
+          },
+          {
+            id: -3,
+            question_text: "行く",
+            correct_answer: "いく",
+            hint: "to go",
+            options: ["たべる", "のむ", "いく", "くる"]
+          },
+          {
+            id: -4,
+            question_text: "来る",
+            correct_answer: "くる",
+            hint: "to come",
+            options: ["たべる", "のむ", "いく", "くる"]
+          }
+        ];
+        console.log('Using fallback template questions:', templateQuestions);
+        setQuestions(templateQuestions);
       } finally {
         setLoading(false);
       }
@@ -48,13 +151,36 @@ export function MixedTestGame({ onExit, bookName, chapterNumber, questionType }:
   }, [bookName, chapterNumber, questionType]);
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64 text-lg text-muted-foreground">Loading questions...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading questions...</p>
+        </div>
+      </div>
+    );
   }
+
   if (error) {
-    return <div className="flex items-center justify-center h-64 text-lg text-red-600">{error}</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={onExit}>Back to Menu</Button>
+        </div>
+      </div>
+    );
   }
+
   if (!questions.length) {
-    return <div className="flex items-center justify-center h-64 text-lg text-muted-foreground">No questions found for this chapter.</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">No questions found for this chapter.</p>
+          <Button onClick={onExit}>Back to Menu</Button>
+        </div>
+      </div>
+    );
   }
 
   const question = questions[currentQuestion];
@@ -95,6 +221,9 @@ export function MixedTestGame({ onExit, bookName, chapterNumber, questionType }:
   };
 
   const resetTest = () => {
+    // Shuffle questions before resetting
+    const shuffledQuestions = [...questions].sort(() => Math.random() - 0.5);
+    setQuestions(shuffledQuestions);
     setCurrentQuestion(0);
     setAnswers(new Array(questions.length).fill(null));
     setTestCompleted(false);

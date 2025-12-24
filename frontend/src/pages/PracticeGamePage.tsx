@@ -7,6 +7,7 @@ import { FlashcardGame } from "@/components/kanji/FlashcardGame";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Brain, PenTool, ArrowLeft } from "lucide-react";
 import { API_BASE_URL } from '@/config';
+import { MixedTestGame } from "@/components/kanji/MixedTestGame";
 
 const GAME_COMPONENTS: any = {
   "input-test-kanji": InputTest,
@@ -108,7 +109,14 @@ export default function PracticeGamePage() {
   }
 
   if (!GameComponent) {
-    return null;
+    return (
+      <MainLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <div className="text-red-600 text-lg font-semibold mb-4">Game component not found.</div>
+          <Button onClick={() => navigate(-1)}>Go Back</Button>
+        </div>
+      </MainLayout>
+    );
   }
 
   // For JLPT, do not pass chapterId
@@ -121,6 +129,27 @@ export default function PracticeGamePage() {
             <h1 className="text-2xl font-bold">{getTitle()}</h1>
           </div>
           <JLPTStyleTest onExit={() => navigate(-1)} bookName={book} chapterNumber={chapterNumber} />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // For MixedTestGame, only pass the props it expects
+  if (game && game.startsWith("mixed-test")) {
+    console.log('Rendering MixedTestGame with props:', { onExit: () => navigate(-1), questionType: type, bookName: book, chapterNumber });
+    return (
+      <MainLayout>
+        <div className="max-w-4xl mx-auto py-8">
+          <div className="flex items-center gap-3 mb-6">
+            {getTypeIcon()}
+            <h1 className="text-2xl font-bold">{getTitle()}</h1>
+          </div>
+          <MixedTestGame
+            onExit={() => navigate(-1)}
+            questionType={type}
+            bookName={book || ''}
+            chapterNumber={chapterNumber || ''}
+          />
         </div>
       </MainLayout>
     );

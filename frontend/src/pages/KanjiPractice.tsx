@@ -70,6 +70,8 @@ export default function KanjiPractice() {
             <GameComponent 
               onExit={() => setCurrentGame(null)} 
               questionType={currentGame === "vocabulary" ? "vocabulary" : "kanji"}
+              bookName="Minna no Nihongo"
+              chapterNumber="1"
             />
           </div>
         </MainLayout>
